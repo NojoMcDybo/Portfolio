@@ -55,7 +55,7 @@ Opazität `gⁱ`).
 - Auf dem Handy wird das 640-px-Iframe herunterskaliert (Text klein). Lösung später: auf schmalen
   Screens die Projektseite nach dem Eintauchen direkt öffnen.
 - Seitenhöhe ≤ 4096 px pro Textur, längere Seiten werden verkleinert statt gekachelt.
-- Alle Projekte sind Platzhalter.
+- Screenshots der Projekte sind lokal aus den Repos gerendert (Desktop-Apps mit Demodaten bzw. einer Tauri-Attrappe), nicht von den Live-Seiten.
 
 ## Inhalte
 

@@ -9,6 +9,12 @@ export async function getStaticPaths() {
 const { p } = Astro.props as { p: Projekt };
 const { Content } = await render(p);
 const d = p.data;
+const [titelbild, ...weitere] = d.bilder;
+const links = [
+  d.links.live && { href: d.links.live, label: 'Live ansehen' },
+  d.links.download && { href: d.links.download, label: 'Download' },
+  d.links.repo && { href: d.links.repo, label: 'Quellcode' },
+].filter(Boolean) as { href: string; label: string }[];
 ---
 <Base title={`${d.title} – Portfolio`} description={d.kurzbeschreibung} hell>
   <nav class="kopf nur-standalone"><a href="/">← Insel</a><a href="/projekte/">Archiv</a></nav>
@@ -18,13 +24,26 @@ const d = p.data;
       <h1>{d.title}</h1>
       <p class="kurz">{d.kurzbeschreibung}</p>
     </header>
-    <div class="streifen" aria-hidden="true">
-      {Array.from({ length: 5 }, (_, i) => <span style={`--i:${i}`} />)}
-    </div>
+    {titelbild && (
+      <figure class="titelbild">
+        <img src={titelbild.src} alt={titelbild.alt} width="1200" height="750" />
+        {titelbild.text && <figcaption>{titelbild.text}</figcaption>}
+      </figure>
+    )}
+    {(d.stack.length > 0 || links.length > 0) && (
+      <div class="leiste">
+        <ul class="stack">{d.stack.map((s) => <li>{s}</li>)}</ul>
+        <p class="links">{links.map((l) => <a href={l.href} rel="noopener">{l.label} ↗</a>)}</p>
+      </div>
+    )}
+    {d.hinweis && <p class="hinweis">{d.hinweis}</p>}
     <div class="text"><Content /></div>
-    <section class="galerie" aria-label="Bildplatzhalter">
-      {Array.from({ length: 6 }, (_, i) => <div class="kachel" style={`--i:${i}`}><span>Abb. {i + 1}</span></div>)}
-    </section>
+    {weitere.map((b) => (
+      <figure class="bild">
+        <img src={b.src} alt={b.alt} loading="lazy" width="1200" height="750" />
+        {b.text && <figcaption>{b.text}</figcaption>}
+      </figure>
+    ))}
     <footer class="fuss">
       <p>{d.title}</p>
       <a class="nur-standalone" href="/">Zurück zur Insel</a>
@@ -38,25 +57,30 @@ const d = p.data;
   article { max-width: 960px; margin: 0 auto; background: #f6f1e7; color: #2b2924; }
   .held {
     background: var(--akzent); color: #fbf7ef;
-    padding: 72px 32px 56px; min-height: 380px;
+    padding: 64px 32px 40px; min-height: 300px;
     display: flex; flex-direction: column; justify-content: flex-end;
-    background-image: radial-gradient(circle at 85% 15%, rgba(255,255,255,.28), transparent 45%);
+    background-image: radial-gradient(circle at 85% 15%, rgba(255,255,255,.22), transparent 45%);
   }
-  .held h1 { font-size: clamp(44px, 9vw, 88px); margin: 8px 0 12px; }
+  .held h1 { font-size: clamp(40px, 8vw, 80px); margin: 8px 0 12px; overflow-wrap: anywhere; hyphens: auto; }
   .meta { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; font-weight: 600; margin: 0; opacity: .85; }
   .kurz { font-size: 18px; max-width: 34em; margin: 0; }
-  .streifen { display: flex; height: 56px; }
-  .streifen span { flex: 1; background: color-mix(in oklab, var(--akzent) calc(100% - var(--i) * 18%), #f6f1e7); }
-  .text { padding: 24px 32px 8px; font-size: 17px; }
-  .text :global(h2) { font-size: 30px; margin: 40px 0 8px; border-top: 4px solid var(--akzent); padding-top: 16px; }
+  figure { margin: 0; }
+  figure img { display: block; width: 100%; height: auto; }
+  .titelbild { background: var(--akzent); padding: 0 32px 32px; }
+  .titelbild img { border-radius: 6px; box-shadow: 0 12px 32px rgba(0,0,0,.25); }
+  .titelbild figcaption { color: #fbf7ef; opacity: .8; }
+  figcaption { font-size: 13px; color: #6b655a; padding-top: 8px; }
+  .leiste { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 20px 32px 0; }
+  .stack { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+  .stack li { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--akzent) 45%, transparent); color: color-mix(in oklab, var(--akzent) 75%, #2b2924); }
+  .links { display: flex; gap: 16px; margin: 0; font-weight: 600; font-size: 14px; }
+  .links a { color: var(--akzent); text-decoration: none; }
+  .hinweis { margin: 20px 32px 0; padding: 12px 16px; border-left: 4px solid var(--akzent); background: color-mix(in oklab, var(--akzent) 8%, #f6f1e7); font-size: 14px; }
+  .text { padding: 8px 32px 8px; font-size: 17px; }
+  .text :global(h2) { font-size: 28px; margin: 36px 0 8px; border-top: 4px solid var(--akzent); padding-top: 14px; }
   .text :global(li) { margin: 6px 0; }
-  .galerie { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 24px 32px 48px; }
-  .kachel {
-    aspect-ratio: 4 / 3; border-radius: 4px; display: flex; align-items: flex-end; padding: 10px;
-    background: linear-gradient(calc(var(--i) * 60deg), var(--akzent), color-mix(in oklab, var(--akzent) 30%, #1d1b18));
-    color: #fbf7ef; font-size: 13px; font-weight: 600;
-  }
-  .fuss { background: #22201c; color: #ece4d6; padding: 48px 32px 64px; display: flex; justify-content: space-between; }
+  .bild { padding: 16px 32px 8px; }
+  .bild img { border-radius: 4px; box-shadow: 0 0 0 1px rgba(43,41,36,.12); }
+  .fuss { background: #22201c; color: #ece4d6; padding: 40px 32px 56px; margin-top: 32px; display: flex; justify-content: space-between; }
   .fuss p { margin: 0; font-family: var(--serif); font-size: 24px; }
-  @media (max-width: 700px) { .galerie { grid-template-columns: 1fr 1fr; } }
 </style>

@@ -17,8 +17,15 @@ const projekte = defineCollection({
     kurzbeschreibung: z.string(),
     // Position im Ring. Ohne Angabe: alphabetisch nach den nummerierten.
     reihenfolge: z.number().optional(),
-    // Nur für die Platzhalter-Optik der Projektseite.
+    // Akzentfarbe der Projektseite (und damit des Teichs).
     farbe: z.string().default('#5f7f5a'),
+    stack: z.array(z.string()).default([]),
+    links: z
+      .object({ live: z.string().url().optional(), repo: z.string().url().optional(), download: z.string().url().optional() })
+      .default({}),
+    // Bilder liegen unter public/projekte/<slug>/. Das erste steht direkt unter dem Titel.
+    bilder: z.array(z.object({ src: z.string(), alt: z.string(), text: z.string().optional() })).default([]),
+    hinweis: z.string().optional(),
   }),
 });
 

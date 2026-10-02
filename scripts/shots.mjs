@@ -11,7 +11,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, stat, readdir, rm } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { chromium } from 'playwright';
 
@@ -75,6 +75,11 @@ for (const { slug } of liste) {
 
 await browser.close();
 server.close();
+// Texturen gelöschter oder umbenannter Projekte entfernen
+for (const datei of await readdir(ZIEL)) {
+  const slug = datei.replace(/(-lo)?\.jpg$/, '');
+  if (datei.endsWith('.jpg') && !manifest.teiche[slug]) await rm(join(ZIEL, datei));
+}
 await writeFile(join(ZIEL, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 console.log(`Manifest: ${Object.keys(manifest.teiche).length} Teiche → ${ZIEL}/manifest.json`);
 
