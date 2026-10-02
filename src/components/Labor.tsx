@@ -3,13 +3,12 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Teich, neuerTeichZustand, MAX_GEISTER } from './scene/Teich';
-import { PLATEAU_D, TEICH_L, TEICH_W } from './scene/insel-layout';
+import { teichTiefe, TEICH_L, TEICH_W } from './scene/insel-layout';
 import { setzeAnisotropie, useTeichTexturen, type ProjektInfo } from './scene/texturen';
 import { Fallback } from './Inselszene';
 import './labor.css';
 
 const BEIGE = '#ece4d6';
-const GROESSE = new THREE.Vector3(TEICH_W, PLATEAU_D, TEICH_L);
 
 /**
  * Prototyp-Schritt 1: ein einzelner Raum-Zeit-Block.
@@ -57,6 +56,7 @@ export default function Labor({ projekte }: { projekte: ProjektInfo[] }) {
   if (!projekt) return <p>Keine Projekte.</p>;
   const t = texturen[projekt.slug];
   if (!t) return null;
+  const tiefe = teichTiefe(t.seiteH);
 
   const scrolle = (wert: number) => {
     const max = document.documentElement.scrollHeight - innerHeight;
@@ -69,7 +69,7 @@ export default function Labor({ projekte }: { projekte: ProjektInfo[] }) {
         <Canvas
           flat
           dpr={[1, 2]}
-          camera={{ fov: 35, position: [7.5, 5.5, 9], near: 0.1, far: 100 }}
+          camera={{ fov: 35, position: [13, 4, 17], near: 0.1, far: 120 }}
           onCreated={({ gl }) => setzeAnisotropie(gl.capabilities.getMaxAnisotropy())}
         >
           <color attach="background" args={[BEIGE]} />
@@ -77,9 +77,9 @@ export default function Labor({ projekte }: { projekte: ProjektInfo[] }) {
             key={projekt.slug}
             textur={t.tex}
             seiteH={t.seiteH}
-            groesse={GROESSE}
+            groesse={new THREE.Vector3(TEICH_W, tiefe, TEICH_L)}
             zustand={zustand}
-            position={new THREE.Vector3(-TEICH_W / 2, PLATEAU_D / 2, -TEICH_L / 2)}
+            position={new THREE.Vector3(-TEICH_W / 2, tiefe / 2, -TEICH_L / 2)}
           />
           <OrbitControls makeDefault enablePan={false} enableZoom={false} target={[0, 0, 0]} />
         </Canvas>

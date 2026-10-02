@@ -13,10 +13,12 @@ export interface TeichZustand {
   max: THREE.Vector3;
   geister: { w: number; a: number }[];
   hover: number;
+  /** 1 = Wasserfall mit Strömung, 0 = reine Seite (beim Eintauchen) */
+  wasser: number;
 }
 
 export function neuerTeichZustand(): TeichZustand {
-  return { min: new THREE.Vector3(0, 0, 0), max: new THREE.Vector3(1, 1, 1), geister: [], hover: 0 };
+  return { min: new THREE.Vector3(0, 0, 0), max: new THREE.Vector3(1, 1, 1), geister: [], hover: 0, wasser: 1 };
 }
 
 interface Props {
@@ -59,8 +61,28 @@ export function Teich({ textur, seiteH, groesse, zustand, position, quaternion, 
     [geo, geistGeo, mat, geister],
   );
 
-  useFrame((_, dt) => {
+  const gischt = useMemo(() => {
+    const m = gischtMaterial();
+    m.uniforms.uSize = mat.uniforms.uSize; // gleiche Größe wie der Block
+    return m;
+  }, [mat]);
+  const gischtGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    const n = 36;
+    const seed = new Float32Array(n * 3);
+    for (let i = 0; i < seed.length; i++) seed[i] = Math.random();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 3));
+    return g;
+  }, []);
+  useEffect(() => () => (gischt.dispose(), gischtGeo.dispose()), [gischt, gischtGeo]);
+
+  useFrame(({ clock }, dt) => {
     const u = mat.uniforms;
+    u.uZeit.value = clock.elapsedTime;
+    u.uWasser.value = THREE.MathUtils.damp(u.uWasser.value, zustand.wasser, 6, dt);
+    gischt.uniforms.uZeit.value = clock.elapsedTime;
+    gischt.uniforms.uAlpha.value = u.uWasser.value * (zustand.max.z > 0.999 ? 1 : 0);
     u.uMin.value.copy(zustand.min);
     u.uMax.value.copy(zustand.max);
     u.uHover.value = THREE.MathUtils.damp(u.uHover.value, zustand.hover, 10, dt);
@@ -74,9 +96,45 @@ export function Teich({ textur, seiteH, groesse, zustand, position, quaternion, 
   return (
     <group position={position} quaternion={quaternion}>
       <mesh geometry={geo} material={mat} {...events} />
+      <points geometry={gischtGeo} material={gischt} frustumCulled={false} raycast={() => null} renderOrder={5} />
       {geister.map((m, i) => (
         <mesh key={i} geometry={geistGeo} material={m} frustumCulled={false} renderOrder={10 + i} raycast={() => null} />
       ))}
     </group>
   );
+}
+
+/** Dunst am unteren Ende: weiche Punkte, die langsam auseinandertreiben und verblassen. */
+function gischtMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uZeit: { value: 0 }, uAlpha: { value: 1 }, uSize: { value: new THREE.Vector3(1, 1, 1) } },
+    vertexShader: /* glsl */ `
+      uniform float uZeit;
+      uniform vec3 uSize;
+      attribute vec3 aSeed;
+      varying float vA;
+      void main() {
+        float phase = fract(uZeit * (0.05 + 0.05 * aSeed.z) + aSeed.x);
+        vec3 p = vec3(
+          (aSeed.x * 1.3 - 0.15) * uSize.x,
+          -uSize.y + 0.6 - phase * 2.4,
+          uSize.z * (0.55 + aSeed.y * 0.7) + phase * 1.2
+        );
+        vA = sin(phase * 3.14159) * (0.10 + 0.12 * aSeed.y);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = (2.2 + 2.0 * aSeed.z) * (0.7 + phase) * 420.0 / -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uAlpha;
+      varying float vA;
+      void main() {
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = pow(smoothstep(1.0, 0.0, d), 1.6) * vA * uAlpha;
+        gl_FragColor = vec4(vec3(0.98, 0.97, 0.94), a);
+        #include <colorspace_fragment>
+      }`,
+    transparent: true,
+    depthWrite: false,
+  });
 }

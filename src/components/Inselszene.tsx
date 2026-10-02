@@ -5,18 +5,18 @@ import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { Insel } from './scene/Insel';
 import { Teich, neuerTeichZustand, MAX_GEISTER, type TeichZustand } from './scene/Teich';
-import { inselLayout, tauchHoehe, PLATEAU_D, TEICH_L, TEICH_W, type InselLayout } from './scene/insel-layout';
+import { inselLayout, tauchHoehe, teichTiefe, TEICH_L, TEICH_W, type InselLayout } from './scene/insel-layout';
 import { setzeAnisotropie, useTeichTexturen, type ProjektInfo } from './scene/texturen';
 import { TauchOverlay } from './TauchOverlay';
 import './inselszene.css';
 
 const BEIGE = '#ece4d6';
 const FOV = 40;
-const POLAR = 1.02; // fester Blickwinkel: nur Drehen um die Hochachse
+const POLAR = 1.16; // fester Blickwinkel: nur Drehen um die Hochachse. Flacher, damit man die Fälle sieht.
 const FLUG_S = 1.6;
 const AUFTAUCHEN_S = 0.7;
 const OBEN = new THREE.Vector3(0, 1, 0);
-const ZIEL = new THREE.Vector3(0, -1.2, 0);
+const ZIEL = new THREE.Vector3(0, -3.5, 0);
 
 export type Phase = 'orbit' | 'flug' | 'tauchen' | 'auftauchen' | 'zurueck';
 
@@ -52,6 +52,11 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
   const layout = useMemo(() => inselLayout(projekte.length), [projekte.length]);
   const zustaende = useMemo(() => projekte.map(() => neuerTeichZustand()), [projekte]);
   const { texturen, ladeScharf } = useTeichTexturen(projekte);
+  // Länge des Wasserfalls = Scrollweg der Seite
+  const groessen = useMemo(
+    () => projekte.map((p) => new THREE.Vector3(TEICH_W, teichTiefe(texturen[p.slug].seiteH), TEICH_L)),
+    [projekte, texturen],
+  );
 
   const sim = useRef<Sim>({
     phase: 'orbit',
@@ -170,21 +175,34 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
     <div className="insel-szene">
       <Canvas
         flat
+        shadows="percentage"
         dpr={[1, 2]}
         camera={{ fov: FOV, near: 0.1, far: 250 }}
         onCreated={({ camera, gl, size }) => {
           kamera.current = camera;
           setzeAnisotropie(gl.capabilities.getMaxAnisotropy());
-          const dist = Math.min(72, 31 * Math.max(1, 1.3 / (size.width / size.height)));
+          const dist = Math.min(90, 38 * Math.max(1, 1.3 / (size.width / size.height)));
           camera.position.set(0, ZIEL.y + dist * Math.cos(POLAR), dist * Math.sin(POLAR));
           camera.lookAt(ZIEL);
           setBereit(true);
         }}
       >
         <color attach="background" args={[BEIGE]} />
-        <fog attach="fog" args={[BEIGE, 45, 120]} />
+        <fog attach="fog" args={[BEIGE, 55, 140]} />
         <hemisphereLight args={['#fffaf0', '#8a7560', 1.4]} />
-        <directionalLight position={[8, 14, 6]} intensity={1.6} />
+        <directionalLight
+          position={[9, 16, 7]}
+          intensity={1.8}
+          castShadow
+          shadow-mapSize={[2048, 2048]}
+          shadow-bias={-0.0004}
+          shadow-camera-left={-14}
+          shadow-camera-right={14}
+          shadow-camera-top={14}
+          shadow-camera-bottom={-14}
+          shadow-camera-near={1}
+          shadow-camera-far={50}
+        />
 
         <Insel layout={layout} />
         {projekte.map((p, i) => {
@@ -195,7 +213,7 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
               key={p.slug}
               textur={t.tex}
               seiteH={t.seiteH}
-              groesse={TEICH_GROESSE}
+              groesse={groessen[i]}
               zustand={zustaende[i]}
               position={platz.ursprung}
               quaternion={platz.quaternion}
@@ -227,14 +245,14 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
           enableDamping
           minPolarAngle={POLAR}
           maxPolarAngle={POLAR}
-          minDistance={18}
-          maxDistance={75}
+          minDistance={20}
+          maxDistance={95}
         />
-        <Kamerafahrt sim={sim} layout={layout} zustaende={zustaende} controls={controls} onPhase={setPhase} />
+        <Kamerafahrt sim={sim} layout={layout} zustaende={zustaende} groessen={groessen} controls={controls} onPhase={setPhase} />
       </Canvas>
 
       <header className="hud-kopf" hidden={!imOrbit}>
-        <p className="hud-titel">Portfolio <span>Prototyp · Graybox</span></p>
+        <p className="hud-titel">Portfolio <span>Prototyp</span></p>
         <nav>
           <a href="/projekte/">Archiv</a>
           <a href="/labor/">Block-Labor</a>
@@ -275,18 +293,19 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
   );
 }
 
-const TEICH_GROESSE = new THREE.Vector3(TEICH_W, PLATEAU_D, TEICH_L);
 
 function Kamerafahrt({
   sim,
   layout,
   zustaende,
+  groessen,
   controls,
   onPhase,
 }: {
   sim: React.RefObject<Sim>;
   layout: InselLayout;
   zustaende: TeichZustand[];
+  groessen: THREE.Vector3[];
   controls: React.RefObject<OrbitControlsImpl | null>;
   onPhase: (p: Phase) => void;
 }) {
@@ -298,12 +317,16 @@ function Kamerafahrt({
     if (s.phase === 'orbit') return;
     const dt = Math.min(rohDt, 1 / 20);
     const platz = layout.plaetze[s.ziel];
+    const tiefe = groessen[s.ziel].y;
+    const z = zustaende[s.ziel];
+    // Strömung aus, sobald die Kamera über dem Teich steht: die Oberfläche muss die Seite sein
+    z.wasser = s.phase === 'tauchen' || s.phase === 'auftauchen' ? 0 : 1;
     const h = tauchHoehe(size.width, size.height, FOV);
     const schritt = (dauer: number) => (s.k = s.sofort ? 1 : Math.min(1, s.k + dt / dauer));
 
     if (s.phase === 'flug') {
       const e = glatt(schritt(FLUG_S));
-      camera.position.lerpVectors(s.vonPos, platz.oberflaeche(0, tmp).addScaledVector(OBEN, h), e);
+      camera.position.lerpVectors(s.vonPos, platz.oberflaeche(0, tiefe, tmp).addScaledVector(OBEN, h), e);
       camera.position.y += Math.sin(Math.PI * e) * 2.5;
       camera.quaternion.slerpQuaternions(s.vonQuat, platz.draufsicht, e);
       if (s.k >= 1) {
@@ -324,7 +347,7 @@ function Kamerafahrt({
         }
       }
       // Kamera sinkt mit der Oberfläche: Abstand bleibt, Overlay bleibt deckungsgleich.
-      camera.position.copy(platz.oberflaeche(s.w, tmp)).addScaledVector(OBEN, h);
+      camera.position.copy(platz.oberflaeche(s.w, tiefe, tmp)).addScaledVector(OBEN, h);
       camera.quaternion.copy(platz.draufsicht);
     } else if (s.phase === 'zurueck') {
       const e = glatt(schritt(FLUG_S));
@@ -339,7 +362,6 @@ function Kamerafahrt({
     }
 
     // Wasseroberfläche + Nachschimmern: die letzten Scrollpositionen als Geister-Ebenen.
-    const z = zustaende[s.ziel];
     z.min.z = s.w;
     s.verlauf.push(s.w);
     if (s.verlauf.length > 40) s.verlauf.shift();

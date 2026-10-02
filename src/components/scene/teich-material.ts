@@ -19,6 +19,7 @@ uniform vec3 uMin;
 uniform vec3 uMax;
 uniform vec3 uSize; // W, D, L in Welt-Einheiten
 varying vec3 vQ;
+varying vec3 vN;
 varying float vShade;
 #include <fog_pars_vertex>
 
@@ -30,10 +31,11 @@ void main() {
     mix(uMin.z, uMax.z, 1.0 - p.y)
   );
   vec3 lokal = vec3(vQ.x * uSize.x, -vQ.z * uSize.y, vQ.y * uSize.z);
+  vN = normal;
 
   // Flächen leicht unterschiedlich hell, damit Kanten lesbar sind. Oben exakt 1.0:
   // die Oberfläche muss pixelgleich zur echten Seite sein.
-  vShade = normal.y > 0.5 ? 1.0 : normal.y < -0.5 ? 0.72 : abs(normal.z) > 0.5 ? 0.94 : 0.86;
+  vShade = normal.y > 0.5 ? 1.0 : normal.y < -0.5 ? 0.72 : abs(normal.z) > 0.5 ? 0.97 : 0.88;
 
   vec4 mvPosition = modelViewMatrix * vec4(lokal, 1.0);
   gl_Position = projectionMatrix * mvPosition;
@@ -45,18 +47,57 @@ const fragment = /* glsl */ `
 uniform sampler2D uSeite;
 uniform float uSeiteH; // CSS-px
 uniform float uVpH;    // CSS-px
+uniform vec3 uSize;
 uniform float uHover;
+uniform float uZeit;
+uniform float uWasser; // 0 = reine Seite (Tauchen), 1 = Wasserfall
+uniform vec3 uDunst;
 varying vec3 vQ;
+varying vec3 vN;
 varying float vShade;
 #include <fog_pars_fragment>
 
+float hash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+
 void main() {
   float T = max(uSeiteH - uVpH, 1.0);
+  bool oben = vN.y > 0.5;
+  bool unten = vN.y < -0.5;
+  vec2 uv = vec2(vQ.x, 0.0);
   float py = vQ.y * uVpH + vQ.z * T;
-  vec4 c = texture2D(uSeite, vec2(vQ.x, 1.0 - py / uSeiteH));
-  c.rgb *= vShade;
-  c.rgb = mix(c.rgb, vec3(1.0), uHover * 0.18);
-  gl_FragColor = vec4(c.rgb, 1.0);
+
+  if (oben) {
+    // Wasseroberfläche: kaum merkliche Wellen, nur außerhalb des Tauchens
+    float t = uZeit * 0.9;
+    uv.x += uWasser * 0.0025 * sin(vQ.y * 38.0 + t * 1.7) ;
+    py += uWasser * 2.5 * sin(vQ.x * 31.0 + t * 1.3);
+  }
+  uv.y = 1.0 - py / uSeiteH;
+  vec3 c = texture2D(uSeite, uv).rgb * vShade;
+
+  if (oben) {
+    // Schaumkante, wo das Wasser über den Rand fällt (Süd = außen)
+    float lippe = smoothstep(0.93, 1.0, vQ.y);
+    float glanz = 0.5 + 0.5 * sin(vQ.x * 70.0 + vQ.y * 20.0 + uZeit * 2.0);
+    c = mix(c, vec3(1.0), uWasser * (lippe * (0.35 + 0.25 * glanz) + 0.04));
+  } else if (!unten) {
+    // Wände: Strömungsstreifen laufen nach unten
+    float quer = abs(vN.x) > 0.5 ? vQ.y * uSize.z : vQ.x * uSize.x;
+    float spalte = floor(quer * 9.0);
+    float tief = vQ.z * uSize.y;
+    float f = fract(tief * (0.18 + 0.12 * hash(spalte)) - uZeit * (0.45 + 0.35 * hash(spalte + 7.0)) + hash(spalte + 3.0));
+    float strahl = smoothstep(0.82, 1.0, f) * (0.5 + 0.5 * hash(spalte + 11.0));
+    c = mix(c, vec3(1.0), uWasser * strahl * 0.28);
+    // Kurz unter der Kante beschleunigt das Wasser: oben heller Saum
+    c = mix(c, vec3(1.0), uWasser * 0.25 * (1.0 - smoothstep(0.0, 0.35, tief)));
+  }
+
+  // Unten löst sich der Fall in Dunst auf
+  float dunst = unten ? 1.0 : smoothstep(max(0.0, 1.0 - 2.2 / uSize.y), 1.0, vQ.z);
+  if (!oben) c = mix(c, uDunst, dunst * 0.85);
+
+  c = mix(c, vec3(1.0), uHover * 0.18);
+  gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
   #include <fog_fragment>
 }
@@ -102,6 +143,9 @@ export interface TeichUniforms {
   uMax: { value: THREE.Vector3 };
   uSize: { value: THREE.Vector3 };
   uHover: { value: number };
+  uZeit: { value: number };
+  uWasser: { value: number };
+  uDunst: { value: THREE.Color };
   [k: string]: THREE.IUniform;
 }
 
@@ -115,6 +159,9 @@ export function createTeichMaterial(tex: THREE.Texture, seiteH: number, vpH: num
     uMax: { value: new THREE.Vector3(1, 1, 1) },
     uSize: { value: size },
     uHover: { value: 0 },
+    uZeit: { value: 0 },
+    uWasser: { value: 1 },
+    uDunst: { value: new THREE.Color('#ece4d6') },
   };
   return new THREE.ShaderMaterial({ uniforms, vertexShader: vertex, fragmentShader: fragment, fog: true });
 }

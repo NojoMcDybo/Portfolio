@@ -5,8 +5,16 @@ import { TEICH_VP_W, TEICH_VP_H } from '../../lib/teich-konstanten';
 // die Oberfläche nicht pixelgenau auf die echte Seite.
 export const TEICH_W = 3.6;
 export const TEICH_L = (TEICH_W * TEICH_VP_H) / TEICH_VP_W;
-// Tiefe aller Teiche = Dicke des Plateaus. Lange Seiten werden in der Zeit gestaucht.
-export const PLATEAU_D = 3.2;
+// Das Plateau ist flach. Die Teiche hängen als Wasserfälle über die Kante hinaus.
+export const PLATEAU_D = 0.8;
+/** Welt-Einheiten pro CSS-Pixel. Gilt in x und in der Zeit: Die Seite hängt unverzerrt herunter. */
+export const PX_WELT = TEICH_W / TEICH_VP_W;
+const MAX_TIEFE = 24; // ≈ 4300 px Scrollweg
+
+/** Länge des Wasserfalls = Scrollweg der Seite (seiteH − Ausschnitt), mindestens etwas mehr als das Plateau. */
+export function teichTiefe(seiteH: number) {
+  return Math.min(MAX_TIEFE, Math.max(PLATEAU_D + 0.6, (seiteH - TEICH_VP_H) * PX_WELT));
+}
 
 const OBEN = new THREE.Vector3(0, 1, 0);
 
@@ -25,8 +33,8 @@ export interface TeichPlatz {
   /** Ecke oben-Nord-West = lokaler Ursprung (innen) */
   ursprung: THREE.Vector3;
   quaternion: THREE.Quaternion;
-  /** Mitte der Wasseroberfläche bei Zeit w ∈ [0,1] */
-  oberflaeche(w: number, ziel?: THREE.Vector3): THREE.Vector3;
+  /** Mitte der Wasseroberfläche bei Zeit w ∈ [0,1] in einem Teich der Tiefe `tiefe` */
+  oberflaeche(w: number, tiefe: number, ziel?: THREE.Vector3): THREE.Vector3;
   /** Kamera-Orientierung für die Draufsicht: Seitenanfang (Nord) zeigt nach oben. */
   draufsicht: THREE.Quaternion;
 }
@@ -84,7 +92,7 @@ export function inselLayout(anzahlTeiche: number): InselLayout {
       ursprung,
       quaternion,
       draufsicht,
-      oberflaeche: (w, ziel = new THREE.Vector3()) => ziel.copy(mitte).setY(-w * PLATEAU_D),
+      oberflaeche: (w, tiefe, ziel = new THREE.Vector3()) => ziel.copy(mitte).setY(-w * tiefe),
     });
   }
 

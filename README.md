@@ -3,14 +3,16 @@
 Schwebendes Plateau, Wald in der Mitte, Teiche am Rand. Jeder Teich ist ein Projekt, seine Tiefe ein
 Raum-Zeit-Block aus der Projektseite. Klick → Draufsicht → man scrollt durch genau diesen Block.
 
-Stand: Prototyp-Schritte 1–3 aus der Recherche (Block, Graybox-Insel, Übergang mit Scroll-Sync).
-Optik (Schritt 4) ist bewusst noch Graybox.
+Stand: Prototyp-Schritte 1–4 aus der Recherche (Block, Insel, Übergang mit Scroll-Sync, Optik).
+Die Insel ist flach, die Teiche hängen als Wasserfälle über die Kante: Ihre Länge ist der Scrollweg
+der Projektseite, 1 px Scroll = 1 px Breite, die Seite hängt also unverzerrt herunter.
 
 ```sh
 npm install
 npm run dev          # http://localhost:4321
 npm run shots        # baut, macht Full-Page-Screenshots aller Projektseiten, baut erneut
 npm run build
+node scripts/baum.mjs  # nur bei Änderungen am Baum: EZ-Tree → public/modelle/baum.glb
 ```
 
 ## Seiten
@@ -40,9 +42,13 @@ Opazität `gⁱ`).
   außen liegt, ist die Nordwand von außen zwangsläufig spiegelverkehrt. Jetzt liegt der Seitenanfang
   innen am Wald, nach außen zeigt `Seite(x, 480 + t)`. Von außen liest man die Oberfläche zum Rand hin
   und dann die Wand hinunter, wie eine über die Kante gefaltete Seite.
-- **Ost-/West-Schlieren sind auf der Insel verdeckt**, weil die Teiche in Kerben im Plateau sitzen.
-  Sichtbar sind sie im Labor. Falls sie auf der Insel sichtbar sein sollen, braucht es Glaswände oder
-  freistehende Teiche.
+- **Wasserfälle statt Teiche in einem dicken Plateau.** Unterhalb des 0,8 dicken Plateaus hängen die
+  Blöcke frei, deshalb sind die Ost-/West-Schlieren jetzt auch auf der Insel sichtbar. Strömung,
+  Schaumkante und Dunst am Ende hängen an `uWasser` und schalten sich beim Eintauchen ab, damit die
+  Oberfläche pixelgleich zur echten Seite bleibt.
+- **EZ-Tree wird nicht im Browser ausgeführt.** Das Paket bringt 3,9 MB mit eingebetteten Texturen mit.
+  `scripts/baum.mjs` erzeugt stattdessen einmal ein reduziertes Modell (≈2 800 Dreiecke, 237 KB),
+  das als zwei InstancedMeshes gerendert wird. Bis es geladen ist, stehen Graybox-Kegel da.
 - **Eigene Kamerafahrt statt `camera-controls`.** Eine exakte Draufsicht mit festem Roll ist für
   `setLookAt` mit Welt-Y als Up-Vektor degeneriert. Position-Lerp und Quaternion-Slerp in
   `Inselszene.tsx` sind einfacher und pixelgenau.
