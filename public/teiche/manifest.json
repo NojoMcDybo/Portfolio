@@ -1,0 +1,41 @@
+{
+  "vpW": 640,
+  "vpH": 480,
+  "teiche": {
+    "lichtsatz": {
+      "hi": "/teiche/lichtsatz.jpg",
+      "lo": "/teiche/lichtsatz-lo.jpg",
+      "hoehe": 2096
+    },
+    "faehrplan": {
+      "hi": "/teiche/faehrplan.jpg",
+      "lo": "/teiche/faehrplan-lo.jpg",
+      "hoehe": 1876
+    },
+    "moosgarten": {
+      "hi": "/teiche/moosgarten.jpg",
+      "lo": "/teiche/moosgarten-lo.jpg",
+      "hoehe": 1836
+    },
+    "hocker-03": {
+      "hi": "/teiche/hocker-03.jpg",
+      "lo": "/teiche/hocker-03-lo.jpg",
+      "hoehe": 1809
+    },
+    "klangkarte": {
+      "hi": "/teiche/klangkarte.jpg",
+      "lo": "/teiche/klangkarte-lo.jpg",
+      "hoehe": 1842
+    },
+    "notizfluss": {
+      "hi": "/teiche/notizfluss.jpg",
+      "lo": "/teiche/notizfluss-lo.jpg",
+      "hoehe": 1670
+    },
+    "fruehe-skizzen": {
+      "hi": "/teiche/fruehe-skizzen.jpg",
+      "lo": "/teiche/fruehe-skizzen-lo.jpg",
+      "hoehe": 1505
+    }
+  }
+}

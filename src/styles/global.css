@@ -1,0 +1,40 @@
+:root {
+  --beige: #ece4d6;
+  --beige-dunkel: #ddd2bf;
+  --tinte: #2b2924;
+  --tinte-leise: #6b655a;
+  --gruen: #6f8f63;
+  --linie: rgba(43, 41, 36, 0.14);
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'Inter', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --beige: #1f1d1a;
+    --beige-dunkel: #2a2723;
+    --tinte: #ede6d8;
+    --tinte-leise: #a59d8f;
+    --linie: rgba(237, 230, 216, 0.16);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--beige);
+  color: var(--tinte);
+  font: 16px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.15; }
+:focus-visible { outline: 2px solid var(--tinte); outline-offset: 3px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* Eingebettet im Teich (iframe) und beim Screenshot: keine Chrome, keine Scrollbar,
+   damit Iframe und Textur pixelgleich sind. */
+html.embed { scrollbar-width: none; }
+html.embed::-webkit-scrollbar { display: none; }
+html.embed .nur-standalone { display: none !important; }

@@ -1,0 +1,34 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getProjekte, getInselProjekte, TYP_LABEL, STATUS_LABEL } from '../../lib/projekte';
+const alle = await getProjekte();
+const insel = new Set((await getInselProjekte()).map((p) => p.id));
+---
+<Base title="Archiv – Portfolio">
+  <main>
+    <p><a href="/">← Insel</a></p>
+    <h1>Archiv</h1>
+    <p class="leise">Alle Projekte. Die Insel zeigt nur die markierten (featured, max. 10).</p>
+    <table>
+      <thead><tr><th>Projekt</th><th>Typ</th><th>Status</th><th>Insel</th></tr></thead>
+      <tbody>
+        {alle.map((p) => (
+          <tr>
+            <td><a href={`/projekte/${p.id}/`}>{p.data.title}</a><br /><span class="leise">{p.data.kurzbeschreibung}</span></td>
+            <td>{TYP_LABEL[p.data.type]}</td>
+            <td>{STATUS_LABEL[p.data.status]}</td>
+            <td>{insel.has(p.id) ? '●' : ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </main>
+</Base>
+<style>
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  .leise { color: var(--tinte-leise); font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--linie); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--tinte-leise); }
+  @media (max-width: 560px) { th:nth-child(2), td:nth-child(2) { display: none; } }
+</style>

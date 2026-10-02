@@ -1,0 +1,31 @@
+---
+import '@fontsource/fraunces/600.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/600.css';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Projektseiten sind hell, auch im Dark Mode: sie sind die Textur im Teich. */
+  hell?: boolean;
+}
+const { title, description = 'Portfolio – Prototyp', hell = false } = Astro.props;
+---
+<!doctype html>
+<html lang="de" data-theme={hell ? 'light' : undefined}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <script is:inline>
+      if (new URLSearchParams(location.search).has('embed')) {
+        document.documentElement.classList.add('embed');
+      }
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

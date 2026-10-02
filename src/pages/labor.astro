@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+import Labor from '../components/Labor';
+import { getProjekte } from '../lib/projekte';
+
+const projekte = (await getProjekte()).map((p) => ({
+  slug: p.id,
+  title: p.data.title,
+  type: p.data.type,
+  status: p.data.status,
+  kurzbeschreibung: p.data.kurzbeschreibung,
+  farbe: p.data.farbe,
+}));
+---
+<Base title="Block-Labor – Portfolio" hell>
+  <Labor client:only="react" projekte={projekte} />
+</Base>

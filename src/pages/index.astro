@@ -1,0 +1,24 @@
+---
+import Base from '../layouts/Base.astro';
+import Inselszene from '../components/Inselszene';
+import { getInselProjekte } from '../lib/projekte';
+
+const projekte = (await getInselProjekte()).map((p) => ({
+  slug: p.id,
+  title: p.data.title,
+  type: p.data.type,
+  status: p.data.status,
+  kurzbeschreibung: p.data.kurzbeschreibung,
+  farbe: p.data.farbe,
+}));
+---
+<Base title="Portfolio – Insel" hell>
+  <Inselszene client:only="react" projekte={projekte} />
+  <noscript>
+    <main style="max-width:640px;margin:0 auto;padding:32px 16px">
+      <h1>Portfolio</h1>
+      <ul>{projekte.map((p) => <li><a href={`/projekte/${p.slug}/`}>{p.title}</a> – {p.kurzbeschreibung}</li>)}</ul>
+      <p><a href="/projekte/">Archiv</a></p>
+    </main>
+  </noscript>
+</Base>

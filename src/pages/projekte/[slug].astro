@@ -1,0 +1,62 @@
+---
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { getProjekte, TYP_LABEL, STATUS_LABEL, type Projekt } from '../../lib/projekte';
+
+export async function getStaticPaths() {
+  return (await getProjekte()).map((p) => ({ params: { slug: p.id }, props: { p } }));
+}
+const { p } = Astro.props as { p: Projekt };
+const { Content } = await render(p);
+const d = p.data;
+---
+<Base title={`${d.title} – Portfolio`} description={d.kurzbeschreibung} hell>
+  <nav class="kopf nur-standalone"><a href="/">← Insel</a><a href="/projekte/">Archiv</a></nav>
+  <article style={`--akzent:${d.farbe}`}>
+    <header class="held">
+      <p class="meta">{TYP_LABEL[d.type]} · {STATUS_LABEL[d.status]}</p>
+      <h1>{d.title}</h1>
+      <p class="kurz">{d.kurzbeschreibung}</p>
+    </header>
+    <div class="streifen" aria-hidden="true">
+      {Array.from({ length: 5 }, (_, i) => <span style={`--i:${i}`} />)}
+    </div>
+    <div class="text"><Content /></div>
+    <section class="galerie" aria-label="Bildplatzhalter">
+      {Array.from({ length: 6 }, (_, i) => <div class="kachel" style={`--i:${i}`}><span>Abb. {i + 1}</span></div>)}
+    </section>
+    <footer class="fuss">
+      <p>{d.title}</p>
+      <a class="nur-standalone" href="/">Zurück zur Insel</a>
+    </footer>
+  </article>
+</Base>
+
+<style>
+  .kopf { display: flex; justify-content: space-between; max-width: 960px; margin: 0 auto; padding: 16px; }
+  .kopf a { text-decoration: none; font-weight: 600; }
+  article { max-width: 960px; margin: 0 auto; background: #f6f1e7; color: #2b2924; }
+  .held {
+    background: var(--akzent); color: #fbf7ef;
+    padding: 72px 32px 56px; min-height: 380px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    background-image: radial-gradient(circle at 85% 15%, rgba(255,255,255,.28), transparent 45%);
+  }
+  .held h1 { font-size: clamp(44px, 9vw, 88px); margin: 8px 0 12px; }
+  .meta { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; font-weight: 600; margin: 0; opacity: .85; }
+  .kurz { font-size: 18px; max-width: 34em; margin: 0; }
+  .streifen { display: flex; height: 56px; }
+  .streifen span { flex: 1; background: color-mix(in oklab, var(--akzent) calc(100% - var(--i) * 18%), #f6f1e7); }
+  .text { padding: 24px 32px 8px; font-size: 17px; }
+  .text :global(h2) { font-size: 30px; margin: 40px 0 8px; border-top: 4px solid var(--akzent); padding-top: 16px; }
+  .text :global(li) { margin: 6px 0; }
+  .galerie { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 24px 32px 48px; }
+  .kachel {
+    aspect-ratio: 4 / 3; border-radius: 4px; display: flex; align-items: flex-end; padding: 10px;
+    background: linear-gradient(calc(var(--i) * 60deg), var(--akzent), color-mix(in oklab, var(--akzent) 30%, #1d1b18));
+    color: #fbf7ef; font-size: 13px; font-weight: 600;
+  }
+  .fuss { background: #22201c; color: #ece4d6; padding: 48px 32px 64px; display: flex; justify-content: space-between; }
+  .fuss p { margin: 0; font-family: var(--serif); font-size: 24px; }
+  @media (max-width: 700px) { .galerie { grid-template-columns: 1fr 1fr; } }
+</style>

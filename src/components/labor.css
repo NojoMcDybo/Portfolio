@@ -1,0 +1,20 @@
+.labor-buehne { position: fixed; inset: 0; background: #ece4d6; }
+.labor-scrollraum { height: 600vh; }
+.labor-panel {
+  position: fixed; top: 16px; right: 16px; width: 260px; max-height: calc(100vh - 32px); overflow: auto;
+  background: rgba(255, 252, 245, 0.88); backdrop-filter: blur(6px);
+  border: 1px solid rgba(43, 41, 36, 0.14); border-radius: 8px; padding: 14px 16px;
+  color: #2b2924; font-size: 13px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.labor-panel h1 { font-size: 20px; margin: 0; }
+.labor-panel p { margin: 0; }
+.labor-panel .leise { color: #6b655a; }
+.labor-panel label { display: flex; flex-direction: column; gap: 2px; }
+.labor-panel label.zeile { flex-direction: row; align-items: center; gap: 6px; }
+.labor-panel label span { display: flex; justify-content: space-between; }
+.labor-panel output { font-variant-numeric: tabular-nums; color: #6b655a; }
+.labor-panel select { font: inherit; padding: 4px; }
+@media (max-width: 560px) {
+  .labor-panel { top: auto; bottom: 8px; right: 8px; left: 8px; width: auto; max-height: 42vh; }
+}
