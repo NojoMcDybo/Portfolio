@@ -19,7 +19,8 @@ node scripts/baum.mjs  # nur bei Änderungen am Baum: EZ-Tree → public/modelle
 
 | Route | Was |
 |---|---|
-| `/` | Insel. Ziehen dreht nur um die Hochachse, Klick auf Teich = Kamerafahrt + Eintauchen, `Esc`/Zurück = Auftauchen, `/#slug` = Deep-Link |
+| `/` | Insel im Überblick: Ziehen dreht um die Hochachse, Klick auf Teich = eintauchen, Klick auf den Wald oder „Insel betreten“ = zu Fuß weiter, `/#slug` = Deep-Link |
+| `/` zu Fuß | Ego-Perspektive ohne Körper. WASD/Pfeile gehen (Shift schneller), Ziehen schaut, Klick auf den Boden = hingehen, Klick auf einen Teich = hinlaufen und eintauchen, am Ufer `E`. `Esc` taucht auf bzw. führt zurück in den Überblick |
 | `/labor/` | Schritt 1: ein Block. Seiten-Scroll = Zeit, Regler für Schnitte und Nachschimmern |
 | `/projekte/` | Archiv (alle außer Drafts), gleichzeitig Fallback ohne WebGL |
 | `/projekte/<slug>/` | Echte Projektseite. Mit `?embed=1` exakt so, wie sie im Teich und im Screenshot erscheint |
@@ -56,7 +57,17 @@ Opazität `gⁱ`).
   Slit-Scan-Pipeline für Bildschirmaufnahmen ist noch offen, `source` ist dafür im Schema vorgesehen.
 - **JPEG statt KTX2**, und Motion ist noch nicht eingebunden (bisher reicht CSS).
 
+## Zu Fuß: wie es billig bleibt
+
+- Keine Physik-Engine. Die Insel ist flach (Bodenhöhe 0), Kollision ist 2D: Kreise für Bäume, Rechtecke für Teiche, Halbebenen für den Inselrand (`src/components/scene/gehen.ts`). Am Hindernis rutscht man entlang statt hängenzubleiben.
+- Ein baumfreier Uferweg verbindet alle Teiche. Man startet auf ihm, mit Blick auf den ersten Teich.
+- Beim Gehen rückt der Dunst heran (3–30 statt 55–140) und das Sichtfeld öffnet sich auf 68°. Was im Dunst liegt, muss nicht scharf sein.
+- Wellen und Strömung blenden beim Anflug aus und rasten am Ziel auf 0 ein, unabhängig von der Bildrate. Sonst stimmt die Oberfläche nicht mit der Seite überein.
+
 ## Bekannte Grenzen
+
+- Vom inneren Ufer aus steht der Text auf der Oberfläche auf dem Kopf. Das ist der Preis dafür, dass der Wasserfall von außen lesbar ist (Seitenanfang innen).
+- Die EZ-Tree-Nadeln sind Alpha-Karten. Nah im Wald kostet das Überzeichnung; für Handys wären opake Low-Poly-Kronen billiger.
 
 - Auf dem Handy wird das 640-px-Iframe herunterskaliert (Text klein). Lösung später: auf schmalen
   Screens die Projektseite nach dem Eintauchen direkt öffnen.

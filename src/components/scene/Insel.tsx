@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useGLTF } from '@react-three/drei';
+import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PLATEAU_D, TEICH_L, type InselLayout } from './insel-layout';
 
@@ -12,7 +13,16 @@ const KRONE_TINT = '#e2ecd2'; // multipliziert die Nadeltextur
 const KRONE_SCHEIN = '#9fbf86';
 
 /** Flaches Plateau mit Kerben für die Teiche, Erdkegel darunter, Wald aus gleich großen Bäumen. */
-export function Insel({ layout }: { layout: InselLayout }) {
+export function Insel({
+  layout,
+  baeume,
+  onBoden,
+}: {
+  layout: InselLayout;
+  baeume: [number, number][];
+  /** Klick auf den Rasen (Weltpunkt). Bäume sind für Raycasts unsichtbar, Klicks gehen durch. */
+  onBoden?: (p: THREE.Vector3, e: ThreeEvent<MouseEvent>) => void;
+}) {
   const plateau = useMemo(() => {
     const g = new THREE.ExtrudeGeometry(layout.form, { depth: PLATEAU_D, bevelEnabled: false });
     g.rotateX(-Math.PI / 2); // (sx, sy, e) → (sx, e, −sy)
@@ -37,24 +47,51 @@ export function Insel({ layout }: { layout: InselLayout }) {
         <meshStandardMaterial attach="material-0" color={ERDE_DUNKEL} roughness={1} />
         <meshStandardMaterial attach="material-1" color={ERDE} roughness={1} />
       </mesh>
-      <mesh geometry={gras} receiveShadow>
+      <mesh geometry={gras} receiveShadow onClick={(e) => onBoden?.(e.point, e)}>
         <meshStandardMaterial color={GRAS} roughness={1} />
       </mesh>
+      <Uferweg layout={layout} />
       <mesh position={[0, -PLATEAU_D - 3.2, 0]} castShadow>
         <cylinderGeometry args={[kegelR, 0.5, 6.4, N * 2, 4, true]} />
         <meshStandardMaterial color={ERDE_DUNKEL} roughness={1} flatShading />
       </mesh>
-      <Wald layout={layout} />
+      <Wald punkte={baeume} />
     </group>
   );
 }
 
 const BAUM_HOEHE = 1.75; // alle gleich groß
+const WEG_BREITE = 0.9;
+const WEG = '#cdbf9f';
 const BAUM_URL = '/modelle/baum.glb';
 
-/** Baumstandorte: gejittertes Raster mit festem Seed, nur auf Land. */
-function useStandorte(layout: InselLayout) {
-  return useMemo(() => {
+/** Sandiger Rundweg vor allen Teichen, parallel zu den Kanten. Klicks gehen an den Rasen darunter. */
+function Uferweg({ layout }: { layout: InselLayout }) {
+  const geo = useMemo(() => {
+    const N = layout.seiten;
+    const k = 1 / Math.cos(Math.PI / N); // Kantenabstand → Eckenradius
+    const g = new THREE.RingGeometry(
+      (layout.wegR - WEG_BREITE / 2) * k,
+      (layout.wegR + WEG_BREITE / 2) * k,
+      N,
+      1,
+      -Math.PI / 2 + Math.PI / N,
+    );
+    g.rotateX(-Math.PI / 2);
+    g.translate(0, 0.004, 0);
+    return g;
+  }, [layout]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <mesh geometry={geo} receiveShadow raycast={() => null}>
+      <meshStandardMaterial color={WEG} roughness={1} />
+    </mesh>
+  );
+}
+
+/** Baumstandorte: gejittertes Raster mit festem Seed, nur auf Land. Auch für die Kollision beim Gehen. */
+export function baumStandorte(layout: InselLayout): [number, number][] {
+  {
     let s = 7;
     const zufall = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     const p: [number, number][] = [];
@@ -63,15 +100,16 @@ function useStandorte(layout: InselLayout) {
       for (let z = -r; z <= r; z += 1.15) {
         const px = x + (zufall() - 0.5) * 0.7;
         const pz = z + (zufall() - 0.5) * 0.7;
-        if (layout.aufLand(px, pz, 0.55)) p.push([px, pz]);
+        // Der Uferweg bleibt frei
+        const weg = Math.abs(layout.polyAbstand(px, pz) - layout.wegR) < WEG_BREITE / 2 + 0.3;
+        if (layout.aufLand(px, pz, 0.55) && !weg) p.push([px, pz]);
       }
     }
     return p;
-  }, [layout]);
+  }
 }
 
-function Wald({ layout }: { layout: InselLayout }) {
-  const punkte = useStandorte(layout);
+function Wald({ punkte }: { punkte: [number, number][] }) {
   return (
     <Suspense fallback={<GrayboxWald punkte={punkte} />}>
       <EzWald punkte={punkte} />

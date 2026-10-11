@@ -3,7 +3,9 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { Insel } from './scene/Insel';
+import { Insel, baumStandorte } from './scene/Insel';
+import { Geher, gehBlick, neuerGehZustand, type GehZustand } from './scene/Geher';
+import { AUGE, kollidiere, uferPunkt, yawZu } from './scene/gehen';
 import { Teich, neuerTeichZustand, MAX_GEISTER, type TeichZustand } from './scene/Teich';
 import { inselLayout, tauchHoehe, teichTiefe, TEICH_L, TEICH_W, type InselLayout } from './scene/insel-layout';
 import { setzeAnisotropie, useTeichTexturen, type ProjektInfo } from './scene/texturen';
@@ -17,8 +19,14 @@ const FLUG_S = 1.6;
 const AUFTAUCHEN_S = 0.7;
 const OBEN = new THREE.Vector3(0, 1, 0);
 const ZIEL = new THREE.Vector3(0, -3.5, 0);
+const FOV_GEHEN = 68;
+// Beim Gehen rückt der Dunst heran: Stimmung, und was im Dunst liegt, muss nicht scharf sein.
+const NEBEL_GEHEN: [number, number] = [3, 30];
+const NEBEL_WEIT: [number, number] = [55, 140];
 
-export type Phase = 'orbit' | 'flug' | 'tauchen' | 'auftauchen' | 'zurueck';
+/** 'orbit' = frei: Überblick (OrbitControls) oder Gehen, je nach `modus`. */
+export type Phase = 'orbit' | 'fahrt' | 'flug' | 'tauchen' | 'auftauchen' | 'zurueck';
+export type Modus = 'ueberblick' | 'gehen';
 
 export interface Sim {
   phase: Phase;
@@ -35,6 +43,18 @@ export interface Sim {
   wStart: number;
   verlauf: number[];
   sofort: boolean;
+  modus: Modus;
+  /** Ziel einer Fahrt zwischen Überblick und Gehen */
+  zielPos: THREE.Vector3;
+  zielQuat: THREE.Quaternion;
+  ueberblickPos: THREE.Vector3;
+  ueberblickQuat: THREE.Quaternion;
+  geh: GehZustand;
+}
+
+const FAHRT_S = 1.3;
+function schrittFahrt(s: Sim, dt: number) {
+  return (s.k = s.sofort ? 1 : Math.min(1, s.k + dt / FAHRT_S));
 }
 
 const glatt = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
@@ -71,18 +91,31 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
     wStart: 0,
     verlauf: [],
     sofort: false,
+    modus: 'ueberblick',
+    zielPos: new THREE.Vector3(),
+    zielQuat: new THREE.Quaternion(),
+    ueberblickPos: new THREE.Vector3(),
+    ueberblickQuat: new THREE.Quaternion(),
+    geh: neuerGehZustand(),
   });
   const kamera = useRef<THREE.Camera | null>(null);
   const controls = useRef<OrbitControlsImpl>(null);
   const gepusht = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('orbit');
+  const [modus, setModus] = useState<Modus>('ueberblick');
   const [aktiv, setAktiv] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const [naehe, setNaehe] = useState(-1);
+  const naeheRef = useRef(-1);
+  naeheRef.current = naehe;
+  const baeume = useMemo(() => baumStandorte(layout), [layout]);
 
   useEffect(() => {
-    zustaende.forEach((z, i) => (z.hover = i === hover && phase === 'orbit' ? 1 : 0));
-  }, [hover, phase, zustaende]);
+    zustaende.forEach(
+      (z, i) => (z.hover = phase === 'orbit' && (modus === 'gehen' ? i === naehe : i === hover) ? 1 : 0),
+    );
+  }, [hover, naehe, phase, modus, zustaende]);
 
   const tauche = useCallback(
     (i: number, push = true) => {
@@ -103,6 +136,7 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
       setPhase('flug');
       setAktiv(i);
       setHover(null);
+      setNaehe(-1);
       ladeScharf(projekte[i].slug);
       if (push) {
         history.pushState({ teich: projekte[i].slug }, '', `#${projekte[i].slug}`);
@@ -111,6 +145,61 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
     },
     [ladeScharf, projekte],
   );
+
+  const fahreZu = useCallback((pos: THREE.Vector3, quat: THREE.Quaternion) => {
+    const s = sim.current;
+    if (!kamera.current) return;
+    s.vonPos.copy(kamera.current.position);
+    s.vonQuat.copy(kamera.current.quaternion);
+    s.zielPos.copy(pos);
+    s.zielQuat.copy(quat);
+    s.k = 0;
+    s.sofort = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    s.phase = 'fahrt';
+    setPhase('fahrt');
+  }, []);
+
+  /** Vom Überblick auf die Insel: an einen geklickten Punkt oder vor den ersten Teich. */
+  const betreten = useCallback(
+    (punkt?: THREE.Vector3) => {
+      const s = sim.current;
+      const cam = kamera.current;
+      if (s.phase !== 'orbit' || s.modus !== 'ueberblick' || !cam) return;
+      if (controls.current) controls.current.enabled = false;
+      s.ueberblickPos.copy(cam.position);
+      s.ueberblickQuat.copy(cam.quaternion);
+      const g = s.geh;
+      if (punkt) {
+        g.pos.set(punkt.x, punkt.z);
+        const blick = cam.getWorldDirection(new THREE.Vector3());
+        g.yaw = Math.atan2(-blick.x, -blick.z);
+      } else {
+        // Auf dem Uferweg, Blick auf den ersten Teich und über die Kante
+        const k = layout.plaetze[0].kante;
+        const u = uferPunkt(layout, 0);
+        g.pos.copy(u);
+        g.yaw = yawZu(g.pos, new THREE.Vector2(k.x, k.z));
+      }
+      kollidiere(g.pos, layout, baeume);
+      g.pitch = -0.12;
+      g.ziel = null;
+      g.zielTeich = -1;
+      s.modus = 'gehen';
+      setModus('gehen');
+      setHover(null);
+      fahreZu(new THREE.Vector3(g.pos.x, AUGE, g.pos.y), gehBlick(g));
+    },
+    [layout, baeume, fahreZu],
+  );
+
+  const verlassen = useCallback(() => {
+    const s = sim.current;
+    if (s.phase !== 'orbit' || s.modus !== 'gehen') return;
+    s.modus = 'ueberblick';
+    setModus('ueberblick');
+    setNaehe(-1);
+    fahreZu(s.ueberblickPos, s.ueberblickQuat);
+  }, [fahreZu]);
 
   const auftauchenIntern = useCallback(() => {
     const s = sim.current;
@@ -161,18 +250,33 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
   }, [bereit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const taste = (e: KeyboardEvent) => e.key === 'Escape' && auftauchen();
+    const taste = (e: KeyboardEvent) => {
+      const s = sim.current;
+      const frei = s.phase === 'orbit' && s.modus === 'gehen';
+      if (e.key === 'Escape') {
+        if (frei) verlassen();
+        else auftauchen();
+      } else if (frei && (e.code === 'KeyE' || e.key === 'Enter') && naeheRef.current >= 0) {
+        if (e.target instanceof HTMLElement && /^(BUTTON|A|INPUT)$/.test(e.target.tagName)) return;
+        tauche(naeheRef.current);
+      }
+    };
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
-  }, [auftauchen]);
+  }, [auftauchen, verlassen, tauche]);
+
+  const gehAktiv = useCallback(() => sim.current.modus === 'gehen' && sim.current.phase === 'orbit', []);
+  const [reduziert] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   if (!webgl) return <Fallback projekte={projekte} grund="Dein Browser kann kein WebGL2." />;
 
   const imOrbit = phase === 'orbit';
+  const ueberblick = imOrbit && modus === 'ueberblick';
+  const gehend = imOrbit && modus === 'gehen';
   const info = hover !== null ? projekte[hover] : null;
 
   return (
-    <div className="insel-szene">
+    <div className={`insel-szene${gehend ? ' gehend' : ''}`}>
       <Canvas
         flat
         shadows="percentage"
@@ -204,7 +308,19 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
           shadow-camera-far={50}
         />
 
-        <Insel layout={layout} />
+        <Insel
+          layout={layout}
+          baeume={baeume}
+          onBoden={(p, e) => {
+            if (e.delta > 6) return; // war Ziehen, kein Klick
+            const s = sim.current;
+            if (s.phase !== 'orbit') return;
+            if (s.modus === 'gehen') {
+              s.geh.ziel = kollidiere(new THREE.Vector2(p.x, p.z), layout, baeume);
+              s.geh.zielTeich = -1;
+            } else betreten(p);
+          }}
+        />
         {projekte.map((p, i) => {
           const t = texturen[p.slug];
           const platz = layout.plaetze[i];
@@ -220,11 +336,16 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
               onClick={(e) => {
                 if (e.delta > 6) return; // war ein Drehen, kein Klick
                 e.stopPropagation();
-                tauche(i);
+                const s = sim.current;
+                if (s.modus === 'gehen' && naeheRef.current !== i) {
+                  // Erst hingehen, dann eintauchen
+                  s.geh.ziel = uferPunkt(layout, i);
+                  s.geh.zielTeich = i;
+                } else tauche(i);
               }}
               onPointerOver={(e) => {
                 e.stopPropagation();
-                if (sim.current.phase === 'orbit') {
+                if (sim.current.phase === 'orbit' && sim.current.modus === 'ueberblick') {
                   setHover(i);
                   document.body.style.cursor = 'pointer';
                 }
@@ -249,9 +370,39 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
           maxDistance={95}
         />
         <Kamerafahrt sim={sim} layout={layout} zustaende={zustaende} groessen={groessen} controls={controls} onPhase={setPhase} />
+        <Geher
+          aktiv={gehAktiv}
+          g={sim.current.geh}
+          layout={layout}
+          baeume={baeume}
+          sofort={reduziert}
+          onNaehe={setNaehe}
+          onAnkunftTeich={(i) => {
+            const g = sim.current.geh;
+            g.yaw = yawZu(g.pos, new THREE.Vector2(layout.plaetze[i].kante.x, layout.plaetze[i].kante.z));
+            tauche(i);
+          }}
+        />
       </Canvas>
 
-      <header className="hud-kopf" hidden={!imOrbit}>
+      {gehend && (
+        <>
+          <header className="hud-kopf">
+            <button className="hud-knopf" onClick={verlassen}>
+              ↑ Überblick <kbd>Esc</kbd>
+            </button>
+            <p className="hud-hilfe">WASD gehen · Shift schneller · Ziehen schauen · Klick: hingehen</p>
+          </header>
+          <div className="fadenkreuz" aria-hidden="true" />
+          {naehe >= 0 && (
+            <button className="eintauch-hinweis" onClick={() => tauche(naehe)}>
+              <strong>{projekte[naehe].title}</strong> <span>E oder Klick: eintauchen</span>
+            </button>
+          )}
+        </>
+      )}
+
+      <header className="hud-kopf" hidden={!ueberblick}>
         <p className="hud-titel">Portfolio <span>Prototyp</span></p>
         <nav>
           <a href="/projekte/">Archiv</a>
@@ -265,10 +416,15 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
             <>
               <strong>{info.title}</strong> {info.kurzbeschreibung}
             </>
-          ) : (
-            'Ziehen: Insel drehen · Klick auf einen Teich: eintauchen'
-          )}
+          ) : ueberblick ? (
+            'Ziehen: drehen · Teich anklicken: eintauchen · Wald anklicken: dort betreten'
+          ) : null}
         </p>
+        {ueberblick && (
+          <button className="hud-knopf betreten" onClick={() => betreten()}>
+            Insel betreten
+          </button>
+        )}
         <ul className="hud-teiche" aria-label="Teiche">
           {projekte.map((p, i) => (
             <li key={p.slug}>
@@ -309,19 +465,46 @@ function Kamerafahrt({
   controls: React.RefObject<OrbitControlsImpl | null>;
   onPhase: (p: Phase) => void;
 }) {
-  const { camera, size } = useThree();
+  const { camera, size, scene } = useThree();
   const tmp = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, rohDt) => {
     const s = sim.current;
-    if (s.phase === 'orbit') return;
     const dt = Math.min(rohDt, 1 / 20);
+
+    // Gehen: weites Sichtfeld und naher Dunst. Überblick und Tauchen: schmal und weit.
+    const geht = s.modus === 'gehen' && (s.phase === 'orbit' || s.phase === 'fahrt' || s.phase === 'zurueck');
+    const pc = camera as THREE.PerspectiveCamera;
+    const sollFov = geht ? FOV_GEHEN : FOV;
+    if (Math.abs(pc.fov - sollFov) > 0.01) {
+      pc.fov = s.sofort ? sollFov : THREE.MathUtils.damp(pc.fov, sollFov, 3, dt);
+      pc.updateProjectionMatrix();
+    }
+    const nebel = scene.fog as THREE.Fog | null;
+    if (nebel) {
+      const [nah, fern] = geht ? NEBEL_GEHEN : NEBEL_WEIT;
+      nebel.near = THREE.MathUtils.damp(nebel.near, nah, 2, dt);
+      nebel.far = THREE.MathUtils.damp(nebel.far, fern, 2, dt);
+    }
+
+    if (s.phase === 'orbit') return;
+    if (s.phase === 'fahrt') {
+      const e = glatt(schrittFahrt(s, dt));
+      camera.position.lerpVectors(s.vonPos, s.zielPos, e);
+      camera.quaternion.slerpQuaternions(s.vonQuat, s.zielQuat, e);
+      if (s.k >= 1) {
+        s.phase = 'orbit';
+        if (controls.current && s.modus === 'ueberblick') controls.current.enabled = true;
+        onPhase('orbit');
+      }
+      return;
+    }
     const platz = layout.plaetze[s.ziel];
     const tiefe = groessen[s.ziel].y;
     const z = zustaende[s.ziel];
     // Strömung aus, sobald die Kamera über dem Teich steht: die Oberfläche muss die Seite sein
-    z.wasser = s.phase === 'tauchen' || s.phase === 'auftauchen' ? 0 : 1;
-    const h = tauchHoehe(size.width, size.height, FOV);
+    z.wasser = s.phase === 'tauchen' || s.phase === 'auftauchen' || (s.phase === 'flug' && s.k > 0.5) ? 0 : 1;
+    const h = tauchHoehe(size.width, size.height, pc.fov);
     const schritt = (dauer: number) => (s.k = s.sofort ? 1 : Math.min(1, s.k + dt / dauer));
 
     if (s.phase === 'flug') {
@@ -356,7 +539,8 @@ function Kamerafahrt({
       camera.quaternion.slerpQuaternions(s.vonQuat, s.orbitQuat, e);
       if (s.k >= 1) {
         s.phase = 'orbit';
-        if (controls.current) controls.current.enabled = true;
+        // Zurück dorthin, woher man kam: in den Überblick oder auf die Insel
+        if (controls.current && s.modus === 'ueberblick') controls.current.enabled = true;
         onPhase('orbit');
       }
     }

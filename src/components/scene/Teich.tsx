@@ -80,7 +80,9 @@ export function Teich({ textur, seiteH, groesse, zustand, position, quaternion, 
   useFrame(({ clock }, dt) => {
     const u = mat.uniforms;
     u.uZeit.value = clock.elapsedTime;
-    u.uWasser.value = THREE.MathUtils.damp(u.uWasser.value, zustand.wasser, 6, dt);
+    // Aus geht schnell und rastet auf 0 ein: beim Eintauchen muss die Oberfläche exakt die Seite sein
+    u.uWasser.value = THREE.MathUtils.damp(u.uWasser.value, zustand.wasser, zustand.wasser === 0 ? 12 : 4, dt);
+    if (zustand.wasser === 0 && u.uWasser.value < 0.02) u.uWasser.value = 0;
     gischt.uniforms.uZeit.value = clock.elapsedTime;
     gischt.uniforms.uAlpha.value = u.uWasser.value * (zustand.max.z > 0.999 ? 1 : 0);
     u.uMin.value.copy(zustand.min);

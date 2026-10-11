@@ -68,3 +68,35 @@
   .tauch-titel { display: none; }
   .hud-info { font-size: 13px; }
 }
+
+/* Gehen */
+.insel-szene.gehend canvas { cursor: grab; }
+.insel-szene.gehend canvas:active { cursor: grabbing; }
+.hud-knopf {
+  font: 600 13px var(--sans); color: #2b2924;
+  background: rgba(255, 252, 245, 0.78); border: 1px solid rgba(43, 41, 36, 0.14);
+  border-radius: 999px; padding: 6px 14px; cursor: pointer; backdrop-filter: blur(6px);
+}
+.hud-knopf:hover, .hud-knopf:focus-visible { background: #fffcf5; }
+.hud-knopf kbd { font: 11px var(--sans); opacity: .6; margin-left: 4px; }
+.hud-knopf.betreten { background: #2b2924; color: #f6f1e7; border-color: #2b2924; }
+.hud-knopf.betreten:hover { background: #3a3730; }
+.hud-hilfe { margin: 0; font-size: 13px; color: #6b655a; text-align: right; }
+.fadenkreuz {
+  position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  border-radius: 50%; background: rgba(43, 41, 36, 0.55); box-shadow: 0 0 0 2px rgba(255, 252, 245, 0.6);
+  pointer-events: none;
+}
+.eintauch-hinweis {
+  position: absolute; left: 50%; top: calc(50% + 28px); transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font: 13px var(--sans); color: #2b2924; cursor: pointer;
+  background: rgba(255, 252, 245, 0.85); border: 1px solid rgba(43, 41, 36, 0.14);
+  border-radius: 12px; padding: 8px 16px; backdrop-filter: blur(6px);
+  animation: auftauchen-hinweis .25s ease-out;
+}
+.eintauch-hinweis strong { font-family: var(--serif); font-size: 18px; font-weight: 600; }
+.eintauch-hinweis span { color: #6b655a; }
+@keyframes auftauchen-hinweis { from { opacity: 0; transform: translate(-50%, 6px); } }
+@media (prefers-reduced-motion: reduce) { .eintauch-hinweis { animation: none; } }
+@media (max-width: 560px) { .hud-hilfe { display: none; } }

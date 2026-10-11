@@ -45,6 +45,12 @@ export interface InselLayout {
   apothem: number;
   plaetze: TeichPlatz[];
   form: THREE.Shape;
+  /** Außennormalen aller Kanten (x, z), für den Inselrand beim Gehen */
+  normalen: THREE.Vector2[];
+  /** Mittellinie des Uferwegs als Abstand zur Mitte, gemessen wie die Kanten (polygonal) */
+  wegR: number;
+  /** Polygonaler Abstand eines Punkts zur Mitte: größte Projektion auf eine Kantennormale */
+  polyAbstand(x: number, z: number): number;
   /** Liegt ein Punkt (x, z) auf dem Plateau und nicht in einem Teich? */
   aufLand(x: number, z: number, rand: number): boolean;
 }
@@ -113,7 +119,10 @@ export function inselLayout(anzahlTeiche: number): InselLayout {
     return true;
   };
 
-  return { seiten: N, radius: R, apothem: a, plaetze, form, aufLand };
+  const normalen = Array.from({ length: N }, (_, k) => new THREE.Vector2(Math.cos(winkel(k)), Math.sin(winkel(k))));
+  const polyAbstand = (x: number, z: number) => Math.max(...normalen.map((n) => x * n.x + z * n.y));
+  const wegR = a - TEICH_L - 0.75;
+  return { seiten: N, radius: R, apothem: a, plaetze, form, normalen, wegR, polyAbstand, aufLand };
 }
 
 /**
