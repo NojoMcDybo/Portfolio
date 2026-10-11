@@ -7,6 +7,7 @@ import { teichTiefe, TEICH_L, TEICH_W } from './scene/insel-layout';
 import { setzeAnisotropie, useTeichTexturen, type ProjektInfo } from './scene/texturen';
 import { Fallback } from './Inselszene';
 import './labor.css';
+import { url } from '../lib/url';
 
 const BEIGE = '#ece4d6';
 
@@ -115,7 +116,7 @@ export default function Labor({ projekte }: { projekte: ProjektInfo[] }) {
           Textur: {t.scharf ? 'Screenshot' : 'Platzhalter (npm run shots fehlt?)'} · Seite {Math.round(t.seiteH)} px
         </p>
         <p>
-          <a href="/">← Insel</a>
+          <a href={url('/')}>← Insel</a>
         </p>
       </aside>
       <div className="labor-scrollraum" aria-hidden="true" />

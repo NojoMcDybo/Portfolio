@@ -12,7 +12,7 @@ npm install
 npm run dev          # http://localhost:4321
 npm run shots        # baut, macht Full-Page-Screenshots aller Projektseiten, baut erneut
 npm run build
-node scripts/baum.mjs  # nur bei Änderungen am Baum: EZ-Tree → public/modelle/baum.glb
+npm run artefakt     # Fassung mit relativen Pfaden für Hosting unter einer Unteradresse → artefakt/
 ```
 
 ## Seiten
@@ -47,9 +47,10 @@ Opazität `gⁱ`).
   Blöcke frei, deshalb sind die Ost-/West-Schlieren jetzt auch auf der Insel sichtbar. Strömung,
   Schaumkante und Dunst am Ende hängen an `uWasser` und schalten sich beim Eintauchen ab, damit die
   Oberfläche pixelgleich zur echten Seite bleibt.
-- **EZ-Tree wird nicht im Browser ausgeführt.** Das Paket bringt 3,9 MB mit eingebetteten Texturen mit.
-  `scripts/baum.mjs` erzeugt stattdessen einmal ein reduziertes Modell (≈2 800 Dreiecke, 237 KB),
-  das als zwei InstancedMeshes gerendert wird. Bis es geladen ist, stehen Graybox-Kegel da.
+- **Low-Poly-Tannen statt EZ-Tree.** Ein Baum ist Stamm plus drei gestaffelte Kegel, opak, flach
+  schattiert, Farben als Vertex-Farben (≈60 Dreiecke). Der ganze Wald ist ein InstancedMesh. Wind läuft
+  im Vertex-Shader (Höhe², Phase aus der Instanzposition, langsame Böen), der Schatten nutzt dieselbe
+  Formel. Die erste Fassung mit EZ-Tree-Nadelkarten war zu Fuß zu teuer (Alpha-Überzeichnung).
 - **Eigene Kamerafahrt statt `camera-controls`.** Eine exakte Draufsicht mit festem Roll ist für
   `setLookAt` mit Welt-Y als Up-Vektor degeneriert. Position-Lerp und Quaternion-Slerp in
   `Inselszene.tsx` sind einfacher und pixelgenau.
@@ -67,7 +68,6 @@ Opazität `gⁱ`).
 ## Bekannte Grenzen
 
 - Vom inneren Ufer aus steht der Text auf der Oberfläche auf dem Kopf. Das ist der Preis dafür, dass der Wasserfall von außen lesbar ist (Seitenanfang innen).
-- Die EZ-Tree-Nadeln sind Alpha-Karten. Nah im Wald kostet das Überzeichnung; für Handys wären opake Low-Poly-Kronen billiger.
 
 - Auf dem Handy wird das 640-px-Iframe herunterskaliert (Text klein). Lösung später: auf schmalen
   Screens die Projektseite nach dem Eintauchen direkt öffnen.

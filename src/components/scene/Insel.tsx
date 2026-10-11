@@ -1,6 +1,6 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useGLTF } from '@react-three/drei';
-import type { ThreeEvent } from '@react-three/fiber';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
 import { PLATEAU_D, TEICH_L, type InselLayout } from './insel-layout';
 
@@ -8,9 +8,10 @@ const GRAS = '#a9b98f';
 const ERDE = '#8a6f55';
 const ERDE_DUNKEL = '#6d5642';
 const STAMM = '#7a5c43';
-const KRONE = '#7f9c6e';
-const KRONE_TINT = '#e2ecd2'; // multipliziert die Nadeltextur
-const KRONE_SCHEIN = '#9fbf86';
+// Sanftes Grün, nach oben heller
+const KRONE_UNTEN = '#6f8c5e';
+const KRONE_MITTE = '#7f9c6b';
+const KRONE_OBEN = '#91ad7c';
 
 /** Flaches Plateau mit Kerben für die Teiche, Erdkegel darunter, Wald aus gleich großen Bäumen. */
 export function Insel({
@@ -63,7 +64,6 @@ export function Insel({
 const BAUM_HOEHE = 1.75; // alle gleich groß
 const WEG_BREITE = 0.9;
 const WEG = '#cdbf9f';
-const BAUM_URL = '/modelle/baum.glb';
 
 /** Sandiger Rundweg vor allen Teichen, parallel zu den Kanten. Klicks gehen an den Rasen darunter. */
 function Uferweg({ layout }: { layout: InselLayout }) {
@@ -109,101 +109,108 @@ export function baumStandorte(layout: InselLayout): [number, number][] {
   }
 }
 
+/** Wald: ein einziges InstancedMesh, ein Draw Call für alle Bäume (plus einer für den Schatten). */
 function Wald({ punkte }: { punkte: [number, number][] }) {
-  return (
-    <Suspense fallback={<GrayboxWald punkte={punkte} />}>
-      <EzWald punkte={punkte} />
-    </Suspense>
-  );
-}
+  const geo = useMemo(() => baumGeometrie(), []);
+  const { mat, tiefe, zeit } = useMemo(() => windMaterialien(), []);
+  const ref = useRef<THREE.InstancedMesh>(null);
 
-/** EZ-Tree-Modell (scripts/baum.mjs), zwei InstancedMeshes: Äste und Nadeln. */
-function EzWald({ punkte }: { punkte: [number, number][] }) {
-  const { scene } = useGLTF(BAUM_URL);
-  const teile = useMemo(() => {
-    const t: { geo: THREE.BufferGeometry; mat: THREE.Material; nadeln: boolean }[] = [];
-    scene.traverse((o) => {
-      if (!(o as THREE.Mesh).isMesh) return;
-      const m = o as THREE.Mesh;
-      const mat = (m.material as THREE.MeshStandardMaterial).clone();
-      const nadeln = o.name.includes('blaetter');
-      if (nadeln) {
-        // Die Nadeltextur ist ein dunkles Fichtengrün. Eigenschein aus derselben Textur macht es sanfter.
-        mat.color.set(KRONE_TINT);
-        mat.emissive.set(KRONE_SCHEIN);
-        mat.emissiveMap = mat.map;
-        mat.emissiveIntensity = 0.85;
-      }
-      t.push({ geo: m.geometry, mat, nadeln });
-    });
-    return t;
-  }, [scene]);
-  const hoehe = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(scene);
-    return box.max.y - box.min.y;
-  }, [scene]);
-
-  const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
   useLayoutEffect(() => {
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const k = BAUM_HOEHE / hoehe;
-    const skala = new THREE.Vector3(k, k, k);
-    for (const im of refs.current) {
-      if (!im) continue;
-      punkte.forEach(([x, z], i) => {
-        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.39);
-        im.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0, z), q, skala));
-      });
-      im.instanceMatrix.needsUpdate = true;
-      im.computeBoundingSphere();
-    }
-  }, [punkte, hoehe, teile]);
-
-  return (
-    <group>
-      {teile.map((t, i) => (
-        <instancedMesh
-          key={i}
-          ref={(el) => void (refs.current[i] = el)}
-          args={[t.geo, t.mat, punkte.length]}
-          castShadow
-          receiveShadow={!t.nadeln}
-          raycast={() => null}
-        />
-      ))}
-    </group>
-  );
-}
-useGLTF.preload(BAUM_URL);
-
-/** Ersatz, solange das Modell lädt: Kegel und Stamm. */
-function GrayboxWald({ punkte }: { punkte: [number, number][] }) {
-  const staemme = useRef<THREE.InstancedMesh>(null);
-  const kronen = useRef<THREE.InstancedMesh>(null);
-  useLayoutEffect(() => {
+    const im = ref.current!;
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const eins = new THREE.Vector3(1, 1, 1);
+    const c = new THREE.Color();
     punkte.forEach(([x, z], i) => {
-      staemme.current!.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0.25, z), q, eins));
-      kronen.current!.setMatrixAt(i, m.compose(new THREE.Vector3(x, 1.1, z), q, eins));
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.39);
+      im.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0, z), q, eins));
+      // Kaum merkliche Helligkeitsunterschiede, damit der Wald nicht gestempelt wirkt
+      const hell = 0.94 + ((i * 37) % 13) / 100;
+      im.setColorAt(i, c.setRGB(hell, hell, hell));
     });
-    staemme.current!.instanceMatrix.needsUpdate = true;
-    kronen.current!.instanceMatrix.needsUpdate = true;
-    staemme.current!.computeBoundingSphere();
-    kronen.current!.computeBoundingSphere();
+    im.instanceMatrix.needsUpdate = true;
+    if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    im.computeBoundingSphere();
   }, [punkte]);
+  useEffect(() => () => (geo.dispose(), mat.dispose(), tiefe.dispose()), [geo, mat, tiefe]);
+
+  useFrame(({ clock }) => {
+    zeit.value = clock.elapsedTime;
+  });
+
   return (
-    <group>
-      <instancedMesh ref={staemme} args={[undefined, undefined, punkte.length]} raycast={() => null}>
-        <cylinderGeometry args={[0.07, 0.09, 0.5, 6]} />
-        <meshStandardMaterial color={STAMM} roughness={1} />
-      </instancedMesh>
-      <instancedMesh ref={kronen} args={[undefined, undefined, punkte.length]} raycast={() => null}>
-        <coneGeometry args={[0.42, 1.3, 7]} />
-        <meshStandardMaterial color={KRONE} roughness={1} flatShading />
-      </instancedMesh>
-    </group>
+    <instancedMesh
+      ref={ref}
+      args={[geo, mat, punkte.length]}
+      customDepthMaterial={tiefe}
+      castShadow
+      receiveShadow
+      raycast={() => null}
+    />
   );
+}
+
+/**
+ * Low-Poly-Tanne: Stamm und drei gestaffelte Kegel, flach schattiert, Farben als Vertex-Farben.
+ * Opak (kein Alpha-Test): nah im Wald keine Überzeichnung, ≈60 Dreiecke pro Baum.
+ */
+function baumGeometrie() {
+  const teile: THREE.BufferGeometry[] = [];
+  const farbig = (g: THREE.BufferGeometry, farbe: string) => {
+    const n = g.toNonIndexed();
+    const c = new THREE.Color(farbe);
+    const f = new Float32Array(n.attributes.position.count * 3);
+    for (let i = 0; i < f.length; i += 3) c.toArray(f, i);
+    n.setAttribute('color', new THREE.BufferAttribute(f, 3));
+    n.deleteAttribute('uv');
+    teile.push(n);
+    g.dispose();
+  };
+  farbig(new THREE.CylinderGeometry(0.045, 0.07, 0.5, 5).translate(0, 0.25, 0), STAMM);
+  const stufen: [number, number, number, string][] = [
+    // Radius, Höhe, Unterkante, Farbe
+    [0.5, 0.72, 0.32, KRONE_UNTEN],
+    [0.39, 0.6, 0.72, KRONE_MITTE],
+    [0.27, 0.5, 1.08, KRONE_OBEN],
+  ];
+  stufen.forEach(([r, h, y, farbe], i) => {
+    const kegel = new THREE.ConeGeometry(r, h, 7, 1);
+    kegel.rotateY(i * 0.45); // Kanten der Stufen versetzt
+    farbig(kegel.translate(0, y + h / 2, 0), farbe);
+  });
+  const g = mergeGeometries(teile)!;
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  return g;
+}
+
+/**
+ * Wind im Vertex-Shader: Auslenkung wächst mit der Höhe², jede Tanne hat ihre Phase
+ * (aus der Instanzposition), dazu langsame Böen. Der Schatten bekommt dieselbe Formel.
+ */
+function windMaterialien() {
+  const zeit = { value: 0 };
+  const wind = (shader: THREE.WebGLProgramParametersWithUniforms) => {
+    shader.uniforms.uZeit = zeit;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uZeit;')
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        {
+          vec3 basis = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+          float h = clamp(position.y / ${BAUM_HOEHE.toFixed(2)}, 0.0, 1.0);
+          float phase = basis.x * 0.7 + basis.z * 0.5;
+          float boe = 0.6 + 0.4 * sin(uZeit * 0.23 + basis.x * 0.08);
+          float aus = (sin(uZeit * 1.4 + phase) * 0.6 + sin(uZeit * 2.3 + phase * 1.7) * 0.25) * boe;
+          transformed.x += aus * 0.06 * h * h;
+          transformed.z += aus * 0.035 * h * h;
+        }`,
+      );
+  };
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 });
+  mat.onBeforeCompile = wind;
+  const tiefe = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  tiefe.onBeforeCompile = wind;
+  return { mat, tiefe, zeit };
 }

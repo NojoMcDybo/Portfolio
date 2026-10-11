@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { platzhalterTextur } from './teich-material';
+import { url as pfadZu } from '../../lib/url';
 
 export interface ManifestEintrag {
   lo: string;
@@ -35,8 +36,8 @@ export function setzeAnisotropie(n: number) {
   anisotropie = Math.min(8, n);
 }
 
-function lade(url: string): Promise<THREE.Texture> {
-  return loader.loadAsync(url).then((t) => {
+function lade(adresse: string): Promise<THREE.Texture> {
+  return loader.loadAsync(pfadZu(adresse)).then((t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = anisotropie;
     return t;
@@ -45,7 +46,7 @@ function lade(url: string): Promise<THREE.Texture> {
 
 let manifestPromise: Promise<Manifest | null> | null = null;
 export function ladeManifest() {
-  manifestPromise ??= fetch('/teiche/manifest.json')
+  manifestPromise ??= fetch(pfadZu('/teiche/manifest.json'))
     .then((r) => (r.ok ? (r.json() as Promise<Manifest>) : null))
     .catch(() => null);
   return manifestPromise;

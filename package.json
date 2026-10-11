@@ -7,7 +7,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "shots": "node scripts/shots.mjs",
-    "check": "astro check"
+    "check": "astro check",
+    "artefakt": "astro build && node scripts/artefakt.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^7.0.0",
@@ -22,7 +23,6 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
-    "@dgreenheck/ez-tree": "^1.1.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",

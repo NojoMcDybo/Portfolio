@@ -5,7 +5,7 @@ import { TEICH_L, TEICH_W, type InselLayout } from './insel-layout';
 
 export const AUGE = 0.5; // Augenhöhe. Bäume sind 1,75 hoch: man fühlt sich klein im Wald.
 const KOERPER = 0.18; // Radius des unsichtbaren Körpers
-const STAMM = 0.32; // Kollisionsradius eines Baums: die unteren Äste reichen weit, sonst steht man in den Nadeln
+const STAMM = 0.36; // Kollisionsradius eines Baums: die unterste Kronenstufe ist 0,5 breit
 const RAND = 0.35; // Abstand zur Inselkante
 const UFER = 0.12; // Abstand zum Wasser
 

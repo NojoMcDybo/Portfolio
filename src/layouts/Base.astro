@@ -20,7 +20,7 @@ const { title, description = 'Portfolio – Prototyp', hell = false } = Astro.pr
     <title>{title}</title>
     <meta name="description" content={description} />
     <script is:inline>
-      if (new URLSearchParams(location.search).has('embed')) {
+      if (location.hash === '#embed' || new URLSearchParams(location.search).has('embed')) {
         document.documentElement.classList.add('embed');
       }
     </script>

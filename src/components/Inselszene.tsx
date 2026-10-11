@@ -11,6 +11,7 @@ import { inselLayout, tauchHoehe, teichTiefe, TEICH_L, TEICH_W, type InselLayout
 import { setzeAnisotropie, useTeichTexturen, type ProjektInfo } from './scene/texturen';
 import { TauchOverlay } from './TauchOverlay';
 import './inselszene.css';
+import { url } from '../lib/url';
 
 const BEIGE = '#ece4d6';
 const FOV = 40;
@@ -405,8 +406,8 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
       <header className="hud-kopf" hidden={!ueberblick}>
         <p className="hud-titel">Portfolio <span>Prototyp</span></p>
         <nav>
-          <a href="/projekte/">Archiv</a>
-          <a href="/labor/">Block-Labor</a>
+          <a href={url('/projekte/')}>Archiv</a>
+          <a href={url('/labor/')}>Block-Labor</a>
         </nav>
       </header>
 
@@ -569,12 +570,12 @@ export function Fallback({ projekte, grund }: { projekte: ProjektInfo[]; grund: 
       <ul>
         {projekte.map((p) => (
           <li key={p.slug}>
-            <a href={`/projekte/${p.slug}/`}>{p.title}</a> – {p.kurzbeschreibung}
+            <a href={url(`/projekte/${p.slug}/`)}>{p.title}</a> – {p.kurzbeschreibung}
           </li>
         ))}
       </ul>
       <p>
-        <a href="/projekte/">Alle Projekte im Archiv</a>
+        <a href={url('/projekte/')}>Alle Projekte im Archiv</a>
       </p>
     </main>
   );

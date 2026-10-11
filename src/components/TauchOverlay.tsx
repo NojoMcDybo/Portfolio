@@ -3,6 +3,7 @@ import { tauchSkala } from './scene/insel-layout';
 import { TEICH_VP_H, TEICH_VP_W } from '../lib/teich-konstanten';
 import type { ProjektInfo } from './scene/texturen';
 import type { Sim } from './Inselszene';
+import { url } from '../lib/url';
 
 /**
  * Die echte, bedienbare Projektseite liegt als Iframe exakt über der Wasseroberfläche.
@@ -40,8 +41,8 @@ export function TauchOverlay({
     const win = frame.current?.contentWindow;
     if (!win) return;
     const doc = win.document;
-    // Links aus dem Iframe öffnen die Seite oben, nicht im Teich
-    doc.querySelectorAll('a').forEach((a) => (a.target = '_top'));
+    // Links aus dem Iframe öffnen die Seite in der Insel-Seite, nicht im Teich
+    doc.querySelectorAll('a').forEach((a) => (a.target = '_parent'));
     let timer = 0;
     win.addEventListener(
       'scroll',
@@ -76,7 +77,7 @@ export function TauchOverlay({
       >
         <iframe
           ref={frame}
-          src={`/projekte/${projekt.slug}/?embed=1`}
+          src={url(`/projekte/${projekt.slug}/#embed`)}
           title={projekt.title}
           width={TEICH_VP_W}
           height={TEICH_VP_H}
@@ -89,7 +90,7 @@ export function TauchOverlay({
         <label>
           <input type="checkbox" checked={volumenblick} onChange={(e) => setVolumenblick(e.target.checked)} /> Volumenblick
         </label>
-        <a href={`/projekte/${projekt.slug}/`}>Seite öffnen ↗</a>
+        <a href={url(`/projekte/${projekt.slug}/`)}>Seite öffnen ↗</a>
       </div>
     </div>
   );
