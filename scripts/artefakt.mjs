@@ -34,9 +34,9 @@ let html = 0;
 for await (const datei of dateien(ZIEL)) {
   const rel = relative(ZIEL, datei).split(sep).join('/');
   if (datei.endsWith('.css')) {
-    // CSS liegt in _astro/, Schriften auch
+    // CSS liegt in assets/, Schriften auch
     const s = await readFile(datei, 'utf8');
-    await writeFile(datei, s.replace(/url\(\/_astro\//g, 'url('));
+    await writeFile(datei, s.replace(/url\(\/assets\//g, 'url('));
     continue;
   }
   if (!datei.endsWith('.html')) continue;
