@@ -4,7 +4,7 @@ slug: litcultlingu
 type: website
 status: fertig
 featured: true
-reihenfolge: 4
+reihenfolge: 5
 farbe: "#a8492a"
 kurzbeschreibung: Lern-Coach für LitCult II und English Linguistics nach dem Muster Explain, Practice, Test.
 stack: [HTML, CSS, JavaScript]

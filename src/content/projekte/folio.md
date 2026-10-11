@@ -4,7 +4,7 @@ slug: folio
 type: app
 status: in-arbeit
 featured: true
-reihenfolge: 3
+reihenfolge: 4
 farbe: "#2a2a30"
 kurzbeschreibung: Ein PDF-Reader für Windows, dessen Bedienung als Glas über dem Dokument schwebt.
 stack: [Tauri v2, Rust, TypeScript, PDF.js, WebGL]

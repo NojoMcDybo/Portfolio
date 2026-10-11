@@ -12,6 +12,11 @@
       "lo": "/teiche/notch-lo.jpg",
       "hoehe": 1997
     },
+    "arena": {
+      "hi": "/teiche/arena.jpg",
+      "lo": "/teiche/arena-lo.jpg",
+      "hoehe": 1887
+    },
     "folio": {
       "hi": "/teiche/folio.jpg",
       "lo": "/teiche/folio-lo.jpg",
@@ -21,11 +26,6 @@
       "hi": "/teiche/litcultlingu.jpg",
       "lo": "/teiche/litcultlingu-lo.jpg",
       "hoehe": 1585
-    },
-    "projekt-atlas": {
-      "hi": "/teiche/projekt-atlas.jpg",
-      "lo": "/teiche/projekt-atlas-lo.jpg",
-      "hoehe": 1840
     },
     "gefilterte-wirklichkeitsverarbeitung": {
       "hi": "/teiche/gefilterte-wirklichkeitsverarbeitung.jpg",
@@ -45,7 +45,7 @@
     "nebel": {
       "hi": "/teiche/nebel.jpg",
       "lo": "/teiche/nebel-lo.jpg",
-      "hoehe": 1997
+      "hoehe": 571
     }
   }
 }
