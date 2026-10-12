@@ -5,7 +5,7 @@ import { TEICH_L, TEICH_W, type InselLayout } from './insel-layout';
 
 export const AUGE = 0.5; // Augenhöhe. Bäume sind 1,75 hoch: man fühlt sich klein im Wald.
 const KOERPER = 0.18; // Radius des unsichtbaren Körpers
-const STAMM = 0.36; // Kollisionsradius eines Baums: die unterste Kronenstufe ist 0,5 breit
+const STAMM = 0.14; // Laubbaum: nur der Stamm stört, die Krone beginnt über Augenhöhe
 const RAND = 0.35; // Abstand zur Inselkante
 const UFER = 0.12; // Abstand zum Wasser
 
@@ -44,13 +44,10 @@ export function kollidiere(p: THREE.Vector2, layout: InselLayout, baeume: [numbe
         }
       }
     }
-    for (const n of layout.normalen) {
-      const ueber = p.x * n.x + p.y * n.y - (layout.apothem - RAND);
-      if (ueber > 0) {
-        p.x -= n.x * ueber;
-        p.y -= n.y * ueber;
-      }
-    }
+    // Runder Inselrand
+    const r = Math.hypot(p.x, p.y);
+    const max = layout.apothem - RAND;
+    if (r > max) p.multiplyScalar(max / r);
   }
   return p;
 }

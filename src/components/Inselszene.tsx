@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { Bloom, EffectComposer, TiltShift2, ToneMapping, Vignette } from '@react-three/postprocessing';
+import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { Insel, baumStandorte } from './scene/Insel';
+import { Lichtstrahlen, himmelTextur } from './scene/Lichtstrahlen';
+import { FARBE, SONNE_RICHTUNG } from './scene/palette';
 import { Geher, gehBlick, neuerGehZustand, type GehZustand } from './scene/Geher';
 import { AUGE, kollidiere, uferPunkt, yawZu } from './scene/gehen';
 import { Teich, neuerTeichZustand, MAX_GEISTER, type TeichZustand } from './scene/Teich';
@@ -13,7 +17,6 @@ import { TauchOverlay } from './TauchOverlay';
 import './inselszene.css';
 import { url } from '../lib/url';
 
-const BEIGE = '#ece4d6';
 const FOV = 40;
 const POLAR = 1.16; // fester Blickwinkel: nur Drehen um die Hochachse. Flacher, damit man die Fälle sieht.
 const FLUG_S = 1.6;
@@ -111,6 +114,9 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
   const naeheRef = useRef(-1);
   naeheRef.current = naehe;
   const baeume = useMemo(() => baumStandorte(layout), [layout]);
+  const himmel = useMemo(() => himmelTextur(), []);
+  const strahlen = useMemo(() => ({ value: 0.9 }), []);
+  const sonne = useMemo(() => new THREE.Vector3(...SONNE_RICHTUNG).normalize().multiplyScalar(24), []);
 
   useEffect(() => {
     zustaende.forEach(
@@ -273,6 +279,9 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
 
   const imOrbit = phase === 'orbit';
   const ueberblick = imOrbit && modus === 'ueberblick';
+  const nachbearbeitung = phase !== 'flug' && phase !== 'tauchen' && phase !== 'auftauchen';
+  // Tilt-Shift voll nur im Überblick (Miniatur), zu Fuß nur ein Hauch Tiefe
+  const ueberblickArt = modus === 'ueberblick';
   const gehend = imOrbit && modus === 'gehen';
   const info = hover !== null ? projekte[hover] : null;
 
@@ -281,7 +290,7 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
       <Canvas
         flat
         shadows="percentage"
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
         camera={{ fov: FOV, near: 0.1, far: 250 }}
         onCreated={({ camera, gl, size }) => {
           kamera.current = camera;
@@ -292,22 +301,26 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
           setBereit(true);
         }}
       >
-        <color attach="background" args={[BEIGE]} />
-        <fog attach="fog" args={[BEIGE, 55, 140]} />
-        <hemisphereLight args={['#fffaf0', '#8a7560', 1.4]} />
+        <primitive attach="background" object={himmel} />
+        <fog attach="fog" args={[FARBE.dunst, 55, 140]} />
+        {/* Goldene Stunde: tiefe Sonne hinten links, warmes Himmelslicht, olivgrünes Bodenlicht */}
+        <hemisphereLight args={[FARBE.himmelLicht, FARBE.bodenLicht, 1.3]} />
         <directionalLight
-          position={[9, 16, 7]}
-          intensity={1.8}
+          position={sonne}
+          color={FARBE.sonne}
+          intensity={3.1}
           castShadow
           shadow-mapSize={[2048, 2048]}
-          shadow-bias={-0.0004}
-          shadow-camera-left={-14}
-          shadow-camera-right={14}
-          shadow-camera-top={14}
-          shadow-camera-bottom={-14}
+          shadow-bias={-0.0005}
+          shadow-normalBias={0.02}
+          shadow-camera-left={-12}
+          shadow-camera-right={12}
+          shadow-camera-top={12}
+          shadow-camera-bottom={-12}
           shadow-camera-near={1}
-          shadow-camera-far={50}
+          shadow-camera-far={60}
         />
+        <Lichtstrahlen staerke={strahlen} />
 
         <Insel
           layout={layout}
@@ -370,7 +383,24 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
           minDistance={20}
           maxDistance={95}
         />
-        <Kamerafahrt sim={sim} layout={layout} zustaende={zustaende} groessen={groessen} controls={controls} onPhase={setPhase} />
+        <Kamerafahrt
+          sim={sim}
+          layout={layout}
+          zustaende={zustaende}
+          groessen={groessen}
+          controls={controls}
+          strahlen={strahlen}
+          onPhase={setPhase}
+        />
+        {/* Miniatur-Look: Schärfeband in der Bildmitte, oben und unten unscharf (Tilt-Shift).
+            Beim Tauchen aus, sonst ist die Oberfläche nicht mehr pixelgleich zur Seite. */}
+        <EffectComposer enabled={nachbearbeitung} multisampling={4}>
+          <TiltShift2 blur={ueberblickArt ? 0.13 : 0.04} taper={0.4} start={[0, 0.55]} end={[1, 0.55]} direction={[1, 0]} samples={10} />
+          <TiltShift2 blur={ueberblickArt ? 0.13 : 0.04} taper={0.4} start={[0, 0.55]} end={[1, 0.55]} direction={[0, 1]} samples={10} />
+          <Bloom intensity={0.4} luminanceThreshold={0.8} luminanceSmoothing={0.2} mipmapBlur />
+          <Vignette darkness={0.42} offset={0.28} />
+          <ToneMapping mode={ToneMappingMode.NEUTRAL} />
+        </EffectComposer>
         <Geher
           aktiv={gehAktiv}
           g={sim.current.geh}
@@ -457,6 +487,7 @@ function Kamerafahrt({
   zustaende,
   groessen,
   controls,
+  strahlen,
   onPhase,
 }: {
   sim: React.RefObject<Sim>;
@@ -464,6 +495,7 @@ function Kamerafahrt({
   zustaende: TeichZustand[];
   groessen: THREE.Vector3[];
   controls: React.RefObject<OrbitControlsImpl | null>;
+  strahlen: { value: number };
   onPhase: (p: Phase) => void;
 }) {
   const { camera, size, scene } = useThree();
@@ -487,6 +519,10 @@ function Kamerafahrt({
       nebel.near = THREE.MathUtils.damp(nebel.near, nah, 2, dt);
       nebel.far = THREE.MathUtils.damp(nebel.far, fern, 2, dt);
     }
+
+    // Lichtstrahlen: im Überblick deutlich, zu Fuß zart, beim Tauchen weg
+    const tauchend = s.phase === 'flug' || s.phase === 'tauchen' || s.phase === 'auftauchen';
+    strahlen.value = THREE.MathUtils.damp(strahlen.value, tauchend ? 0 : geht ? 0.35 : 0.9, 3, dt);
 
     if (s.phase === 'orbit') return;
     if (s.phase === 'fahrt') {

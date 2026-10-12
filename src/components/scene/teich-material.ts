@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FARBE, SONNE_RICHTUNG } from './palette';
 
 /*
  * Raum-Zeit-Block aus einem einzigen Full-Page-Screenshot.
@@ -20,6 +21,7 @@ uniform vec3 uMax;
 uniform vec3 uSize; // W, D, L in Welt-Einheiten
 varying vec3 vQ;
 varying vec3 vN;
+varying vec3 vWelt;
 varying float vShade;
 #include <fog_pars_vertex>
 
@@ -32,6 +34,7 @@ void main() {
   );
   vec3 lokal = vec3(vQ.x * uSize.x, -vQ.z * uSize.y, vQ.y * uSize.z);
   vN = normal;
+  vWelt = (modelMatrix * vec4(lokal, 1.0)).xyz;
 
   // Flächen leicht unterschiedlich hell, damit Kanten lesbar sind. Oben exakt 1.0:
   // die Oberfläche muss pixelgleich zur echten Seite sein.
@@ -52,8 +55,13 @@ uniform float uHover;
 uniform float uZeit;
 uniform float uWasser; // 0 = reine Seite (Tauchen), 1 = Wasserfall
 uniform vec3 uDunst;
+uniform vec3 uSonne;      // Richtung zur Sonne
+uniform vec3 uSonnenFarbe;
+uniform vec3 uHimmel;
+uniform vec3 uWassertint;
 varying vec3 vQ;
 varying vec3 vN;
+varying vec3 vWelt;
 varying float vShade;
 #include <fog_pars_fragment>
 
@@ -76,6 +84,14 @@ void main() {
   vec3 c = texture2D(uSeite, uv).rgb * vShade;
 
   if (oben) {
+    // Wasser: schräg gesehen spiegelt es den Himmel (Fresnel), dazu Sonnenglanz auf den Wellen
+    vec3 V = normalize(cameraPosition - vWelt);
+    vec3 N = normalize(vec3(sin(vQ.x * 31.0 + uZeit * 1.3) * 0.05, 1.0, sin(vQ.y * 38.0 + uZeit * 1.7) * 0.05));
+    float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
+    float glanz2 = pow(max(dot(N, normalize(uSonne + V)), 0.0), 160.0);
+    c = mix(c, c * uWassertint, 0.25 * uWasser);
+    c = mix(c, uHimmel, fres * 0.55 * uWasser);
+    c += uSonnenFarbe * glanz2 * 1.6 * uWasser;
     // Schaumkante, wo das Wasser über den Rand fällt (Süd = außen)
     float lippe = smoothstep(0.93, 1.0, vQ.y);
     float glanz = 0.5 + 0.5 * sin(vQ.x * 70.0 + vQ.y * 20.0 + uZeit * 2.0);
@@ -146,6 +162,7 @@ export interface TeichUniforms {
   uZeit: { value: number };
   uWasser: { value: number };
   uDunst: { value: THREE.Color };
+  uSonne: { value: THREE.Vector3 };
   [k: string]: THREE.IUniform;
 }
 
@@ -161,7 +178,11 @@ export function createTeichMaterial(tex: THREE.Texture, seiteH: number, vpH: num
     uHover: { value: 0 },
     uZeit: { value: 0 },
     uWasser: { value: 1 },
-    uDunst: { value: new THREE.Color('#ece4d6') },
+    uDunst: { value: new THREE.Color(FARBE.dunst) },
+    uSonne: { value: new THREE.Vector3(...SONNE_RICHTUNG).normalize() },
+    uSonnenFarbe: { value: new THREE.Color(FARBE.sonne) },
+    uHimmel: { value: new THREE.Color(FARBE.spiegel) },
+    uWassertint: { value: new THREE.Color(FARBE.wasser) },
   };
   return new THREE.ShaderMaterial({ uniforms, vertexShader: vertex, fragmentShader: fragment, fog: true });
 }

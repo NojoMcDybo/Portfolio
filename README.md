@@ -58,6 +58,16 @@ Opazität `gⁱ`).
   Slit-Scan-Pipeline für Bildschirmaufnahmen ist noch offen, `source` ist dafür im Schema vorgesehen.
 - **JPEG statt KTX2**, und Motion ist noch nicht eingebunden (bisher reicht CSS).
 
+## Atmosphäre (goldene Stunde, Miniatur)
+
+- Palette und Sonnenrichtung zentral in `src/components/scene/palette.ts`.
+- Runde Insel mit rechteckigen Teich-Kerben, Laubbäume (Stamm + vier Ikosaeder, ≈90 Dreiecke, ein InstancedMesh), Krone über Augenhöhe.
+- Gras-Engine: bis zu 60 000 Halme (Handy 22 000) als ein InstancedMesh, Normalen nach oben, Wind aus `scene/wind.ts` (Wind in Weltrichtung, auch bei gedrehten Instanzen).
+- Wiese ohne Textur: Rauschflecken im Fragment-Shader.
+- Wasser: Fresnel-Spiegelung, Sonnenglanz, Tönung, nur außerhalb des Tauchens (`uWasser`).
+- Lichtstrahlen: additive Achsen-Billboards entlang der Sonnenrichtung, ein Draw Call.
+- Nachbearbeitung: Tilt-Shift (zwei Pässe, Schärfeband in der Bildmitte), Bloom, Vignette, Neutral-Tone-Mapping. Beim Tauchen komplett aus.
+
 ## Zu Fuß: wie es billig bleibt
 
 - Keine Physik-Engine. Die Insel ist flach (Bodenhöhe 0), Kollision ist 2D: Kreise für Bäume, Rechtecke für Teiche, Halbebenen für den Inselrand (`src/components/scene/gehen.ts`). Am Hindernis rutscht man entlang statt hängenzubleiben.
