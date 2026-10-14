@@ -1,23 +1,28 @@
-// Goldene Stunde: Gegenlicht von hinten links, warme Luft, gelbgrünes Laub.
+// Tiny-Glade-Tag: warme, tief stehende Sonne, kühles Himmelslicht (Schatten werden bläulich),
+// sattes, weiches Grün, Pastellhimmel. Alles, was Farbe hat, kommt von hier.
 export const FARBE = {
-  himmelOben: '#f7dcc0',
-  himmelUnten: '#f3c6a2',
-  dunst: '#f4cfab', // Nebel = Horizont
-  sonne: '#ffd49a',
-  himmelLicht: '#ffe8cc',
-  bodenLicht: '#6f7a3a',
-  gras: '#9cb83a',
-  grasHell: '#c9d64e',
-  grasDunkel: '#6f9128',
-  weg: '#dcc59a',
-  erde: '#7d5636',
-  erdeDunkel: '#5e3f27',
-  stamm: '#8a6b4c',
-  kroneUnten: '#5f8a1f',
-  kroneOben: '#cbd94c',
-  wasser: '#7fc4b8',
-  spiegel: '#b9dccf', // was das Wasser schräg gesehen spiegelt: kühl gegen den warmen Himmel
+  himmelOben: '#a9c8e2',
+  himmelUnten: '#f2e6cf',
+  dunst: '#e6e4d6', // Nebel = Horizont
+  sonne: '#ffe1b0',
+  himmelLicht: '#c3d8ee',
+  bodenLicht: '#6f8f45',
+  gras: '#79ad45',
+  grasHell: '#b7d667',
+  grasDunkel: '#4c8a33',
+  weg: '#d9c49b',
+  erde: '#8a6446',
+  erdeDunkel: '#654631',
+  stamm: '#7c5d45',
+  kroneUnten: '#3f7a2f',
+  kroneOben: '#a8d05a',
+  stein: '#cfc8b8',
+  steinDunkel: '#9f9787',
+  moos: '#8fb052',
+  wasser: '#7fc4c0',
+  spiegel: '#cfe3ef', // was das Wasser schräg gesehen spiegelt: der Himmel
+  blumen: ['#fffaf0', '#fbe7a1', '#d9c6f0', '#f6c9d3', '#ffffff'],
 } as const;
 
-/** Richtung zur Sonne: links, leicht von hinten, tief genug für lange Schatten, hoch genug, dass die Kronen Licht fangen */
-export const SONNE_RICHTUNG: [number, number, number] = [-0.72, 0.62, -0.3];
+/** Richtung zur Sonne: links, leicht von hinten, hoch genug, dass Kronen und Wiese Licht fangen */
+export const SONNE_RICHTUNG: [number, number, number] = [-0.7, 0.66, -0.28];

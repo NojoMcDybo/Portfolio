@@ -4,21 +4,32 @@ import * as THREE from 'three';
 import type { InselLayout } from './insel-layout';
 import { FARBE } from './palette';
 import { windShader } from './wind';
+import type { Hoehe } from './gelaende';
 
 // Augenhöhe ist 0,5: die Wiese reicht bis knapp über den Knöchel
-const HALM_H = 0.075;
-const HALM_B = 0.02;
+const HALM_H = 0.085;
+const HALM_B = 0.028;
 
 /**
  * Gras-Engine: ein InstancedMesh, ein Draw Call. Halme stehen auf der Wiese, nicht auf dem
  * Weg und nicht im Wasser. Normalen zeigen nach oben (Wiese statt Einzelblatt), beide Seiten
  * als eigene Dreiecke statt DoubleSide, damit die Rückseite nicht dunkel wird.
  */
-export function Gras({ layout, wegBreite }: { layout: InselLayout; wegBreite: number }) {
+export function Gras({
+  layout,
+  hoehe,
+  wegBreite,
+  anteil = 1,
+}: {
+  layout: InselLayout;
+  hoehe: Hoehe;
+  wegBreite: number;
+  anteil?: number;
+}) {
   const anzahl = useMemo(() => {
     const klein = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-    return klein ? 22000 : 60000;
-  }, []);
+    return Math.round((klein ? 26000 : 70000) * anteil);
+  }, [anteil]);
   const geo = useMemo(() => halmGeometrie(), []);
   const { mat, zeit } = useMemo(() => {
     const zeit = { value: 0 };
@@ -48,16 +59,18 @@ export function Gras({ layout, wegBreite }: { layout: InselLayout; wegBreite: nu
       if (Math.abs(layout.randAbstand(x, z) - layout.wegR) < wegBreite / 2 - 0.06 - zufall() * 0.12) continue;
       const k = 0.65 + zufall() * 0.7;
       q.setFromAxisAngle(achse, zufall() * Math.PI);
-      im.setMatrixAt(i, m.compose(pos.set(x, 0, z), q, skala.set(k, k * (0.8 + zufall() * 0.5), k)));
-      const hell = 0.85 + zufall() * 0.3;
-      im.setColorAt(i, c.setRGB(hell, hell, hell * 0.95));
+      im.setMatrixAt(i, m.compose(pos.set(x, hoehe(x, z), z), q, skala.set(k, k * (0.8 + zufall() * 0.7), k)));
+      // Farbvariation wie in einer echten Wiese: mal gelblicher, mal kühler
+      const hell = 0.82 + zufall() * 0.32;
+      const gelb = zufall() * 0.12;
+      im.setColorAt(i, c.setRGB(hell + gelb, hell + gelb * 0.6, hell * 0.9));
       i++;
     }
     im.count = i;
     im.instanceMatrix.needsUpdate = true;
     if (im.instanceColor) im.instanceColor.needsUpdate = true;
     im.computeBoundingSphere();
-  }, [layout, anzahl, wegBreite]);
+  }, [layout, hoehe, anzahl, wegBreite]);
   useEffect(() => () => (geo.dispose(), mat.dispose()), [geo, mat]);
 
   useFrame(({ clock }) => {

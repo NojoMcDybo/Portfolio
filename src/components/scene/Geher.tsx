@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AUGE, kollidiere, teichInReichweite, yawZu } from './gehen';
 import type { InselLayout } from './insel-layout';
+import type { Hoehe } from './gelaende';
 
 const TEMPO = 2.2;
 const TEMPO_SCHNELL = 4.2;
@@ -18,6 +19,8 @@ export interface GehZustand {
   zielTeich: number;
   stau: number;
   schritt: number;
+  /** geglättete Bodenhöhe unter dem Körper */
+  boden?: number;
 }
 
 export function neuerGehZustand(): GehZustand {
@@ -36,6 +39,7 @@ export function Geher({
   aktiv,
   g,
   layout,
+  hoehe,
   baeume,
   sofort,
   onNaehe,
@@ -44,6 +48,7 @@ export function Geher({
   aktiv: () => boolean;
   g: GehZustand;
   layout: InselLayout;
+  hoehe: Hoehe;
   baeume: [number, number][];
   sofort: boolean;
   onNaehe: (teich: number) => void;
@@ -150,7 +155,10 @@ export function Geher({
 
     // Kaum merkliches Wippen beim Gehen, nicht bei reduzierter Bewegung
     const wippen = sofort ? 0 : Math.sin(g.schritt) * 0.012;
-    camera.position.set(g.pos.x, AUGE + wippen, g.pos.y);
+    // Augenhöhe folgt dem Gelände, gedämpft: Hügel heben einen sanft an
+    const boden = hoehe(g.pos.x, g.pos.y);
+    g.boden = g.boden === undefined ? boden : THREE.MathUtils.damp(g.boden, boden, 8, dt);
+    camera.position.set(g.pos.x, AUGE + g.boden + wippen, g.pos.y);
     camera.quaternion.copy(gehBlick(g, tmp.q));
 
     vor.set(-Math.sin(g.yaw), -Math.cos(g.yaw));

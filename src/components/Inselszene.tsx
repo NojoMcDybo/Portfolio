@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
-import { Bloom, EffectComposer, TiltShift2, ToneMapping, Vignette } from '@react-three/postprocessing';
+import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
+import { Bloom, EffectComposer, N8AO, TiltShift2, ToneMapping, Vignette } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { Insel, baumStandorte } from './scene/Insel';
 import { Lichtstrahlen, himmelTextur } from './scene/Lichtstrahlen';
+import { Pollen } from './scene/Pollen';
 import { FARBE, SONNE_RICHTUNG } from './scene/palette';
+import { gelaende } from './scene/gelaende';
+import { MAX_STUFE, feste, qualitaet, startStufe } from './scene/qualitaet';
 import { Geher, gehBlick, neuerGehZustand, type GehZustand } from './scene/Geher';
 import { AUGE, kollidiere, uferPunkt, yawZu } from './scene/gehen';
 import { Teich, neuerTeichZustand, MAX_GEISTER, type TeichZustand } from './scene/Teich';
@@ -114,8 +117,11 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
   const naeheRef = useRef(-1);
   naeheRef.current = naehe;
   const baeume = useMemo(() => baumStandorte(layout), [layout]);
+  const hoehe = useMemo(() => gelaende(layout), [layout]);
+  const [stufe, setStufe] = useState(startStufe);
+  const q = useMemo(() => qualitaet(stufe), [stufe]);
   const himmel = useMemo(() => himmelTextur(), []);
-  const strahlen = useMemo(() => ({ value: 0.9 }), []);
+  const strahlen = useMemo(() => ({ value: 0.22 }), []);
   const sonne = useMemo(() => new THREE.Vector3(...SONNE_RICHTUNG).normalize().multiplyScalar(24), []);
 
   useEffect(() => {
@@ -194,9 +200,10 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
       s.modus = 'gehen';
       setModus('gehen');
       setHover(null);
-      fahreZu(new THREE.Vector3(g.pos.x, AUGE, g.pos.y), gehBlick(g));
+      g.boden = hoehe(g.pos.x, g.pos.y);
+      fahreZu(new THREE.Vector3(g.pos.x, AUGE + g.boden, g.pos.y), gehBlick(g));
     },
-    [layout, baeume, fahreZu],
+    [layout, baeume, hoehe, fahreZu],
   );
 
   const verlassen = useCallback(() => {
@@ -290,7 +297,7 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
       <Canvas
         flat
         shadows="percentage"
-        dpr={[1, 1.5]}
+        dpr={q.dpr}
         camera={{ fov: FOV, near: 0.1, far: 250 }}
         onCreated={({ camera, gl, size }) => {
           kamera.current = camera;
@@ -303,16 +310,17 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
       >
         <primitive attach="background" object={himmel} />
         <fog attach="fog" args={[FARBE.dunst, 55, 140]} />
-        {/* Goldene Stunde: tiefe Sonne hinten links, warmes Himmelslicht, olivgrünes Bodenlicht */}
-        <hemisphereLight args={[FARBE.himmelLicht, FARBE.bodenLicht, 1.3]} />
+        {/* Warme Sonne, kühles Himmelslicht: Schatten werden bläulich statt grau */}
+        <hemisphereLight args={[FARBE.himmelLicht, FARBE.bodenLicht, 1.15]} />
         <directionalLight
           position={sonne}
           color={FARBE.sonne}
-          intensity={3.1}
+          intensity={3.0}
           castShadow
           shadow-mapSize={[2048, 2048]}
-          shadow-bias={-0.0005}
+          shadow-bias={-0.0004}
           shadow-normalBias={0.02}
+          shadow-radius={4}
           shadow-camera-left={-12}
           shadow-camera-right={12}
           shadow-camera-top={12}
@@ -320,10 +328,20 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
           shadow-camera-near={1}
           shadow-camera-far={60}
         />
+        {feste() === undefined && (
+          <PerformanceMonitor
+            flipflops={3}
+            onDecline={() => setStufe((s) => Math.min(MAX_STUFE, s + 1))}
+            onFallback={() => setStufe(MAX_STUFE)}
+          />
+        )}
         <Lichtstrahlen staerke={strahlen} />
+        <Pollen radius={layout.apothem - 0.6} staerke={strahlen} />
 
         <Insel
           layout={layout}
+          hoehe={hoehe}
+          grasAnteil={q.grasAnteil}
           baeume={baeume}
           onBoden={(p, e) => {
             if (e.delta > 6) return; // war Ziehen, kein Klick
@@ -394,17 +412,20 @@ export default function Inselszene({ projekte }: { projekte: ProjektInfo[] }) {
         />
         {/* Miniatur-Look: Schärfeband in der Bildmitte, oben und unten unscharf (Tilt-Shift).
             Beim Tauchen aus, sonst ist die Oberfläche nicht mehr pixelgleich zur Seite. */}
-        <EffectComposer enabled={nachbearbeitung} multisampling={4}>
-          <TiltShift2 blur={ueberblickArt ? 0.13 : 0.04} taper={0.4} start={[0, 0.55]} end={[1, 0.55]} direction={[1, 0]} samples={10} />
-          <TiltShift2 blur={ueberblickArt ? 0.13 : 0.04} taper={0.4} start={[0, 0.55]} end={[1, 0.55]} direction={[0, 1]} samples={10} />
-          <Bloom intensity={0.4} luminanceThreshold={0.8} luminanceSmoothing={0.2} mipmapBlur />
-          <Vignette darkness={0.42} offset={0.28} />
+        <EffectComposer enabled={nachbearbeitung} multisampling={q.msaa}>
+          {/* Kontaktschatten in Ecken, unter Kronen, zwischen Steinen: der Tiny-Glade-Weichzeichner */}
+          <N8AO enabled={q.ao} halfRes aoRadius={0.9} distanceFalloff={0.6} intensity={2.2} color="#2d4a3a" aoSamples={12} denoiseSamples={4} />
+          <TiltShift2 blur={q.tiltShift ? (ueberblickArt ? 0.13 : 0.04) : 0} taper={0.4} start={[0, 0.55]} end={[1, 0.55]} direction={[1, 0]} samples={10} />
+          <TiltShift2 blur={q.tiltShift ? (ueberblickArt ? 0.13 : 0.04) : 0} taper={0.4} start={[0, 0.55]} end={[1, 0.55]} direction={[0, 1]} samples={10} />
+          <Bloom intensity={0.3} luminanceThreshold={0.82} luminanceSmoothing={0.2} mipmapBlur />
+          <Vignette darkness={0.3} offset={0.3} />
           <ToneMapping mode={ToneMappingMode.NEUTRAL} />
         </EffectComposer>
         <Geher
           aktiv={gehAktiv}
           g={sim.current.geh}
           layout={layout}
+          hoehe={hoehe}
           baeume={baeume}
           sofort={reduziert}
           onNaehe={setNaehe}
@@ -522,7 +543,7 @@ function Kamerafahrt({
 
     // Lichtstrahlen: im Überblick deutlich, zu Fuß zart, beim Tauchen weg
     const tauchend = s.phase === 'flug' || s.phase === 'tauchen' || s.phase === 'auftauchen';
-    strahlen.value = THREE.MathUtils.damp(strahlen.value, tauchend ? 0 : geht ? 0.35 : 0.9, 3, dt);
+    strahlen.value = THREE.MathUtils.damp(strahlen.value, tauchend ? 0 : geht ? 0.22 : 0.22, 3, dt);
 
     if (s.phase === 'orbit') return;
     if (s.phase === 'fahrt') {

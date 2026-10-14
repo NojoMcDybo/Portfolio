@@ -58,15 +58,15 @@ Opazität `gⁱ`).
   Slit-Scan-Pipeline für Bildschirmaufnahmen ist noch offen, `source` ist dafür im Schema vorgesehen.
 - **JPEG statt KTX2**, und Motion ist noch nicht eingebunden (bisher reicht CSS).
 
-## Atmosphäre (goldene Stunde, Miniatur)
+## Look (Richtung Tiny Glade)
 
-- Palette und Sonnenrichtung zentral in `src/components/scene/palette.ts`.
-- Runde Insel mit rechteckigen Teich-Kerben, Laubbäume (Stamm + vier Ikosaeder, ≈90 Dreiecke, ein InstancedMesh), Krone über Augenhöhe.
-- Gras-Engine: bis zu 60 000 Halme (Handy 22 000) als ein InstancedMesh, Normalen nach oben, Wind aus `scene/wind.ts` (Wind in Weltrichtung, auch bei gedrehten Instanzen).
-- Wiese ohne Textur: Rauschflecken im Fragment-Shader.
+- Palette und Sonnenrichtung zentral in `src/components/scene/palette.ts`: warme Sonne, kühles Himmelslicht, Pastellhimmel.
+- Gelände: eine Höhenfunktion `h(x, z)` (`scene/gelaende.ts`) für Wiese, Bäume, Gras, Blumen, Steine und die Kamera zu Fuß; flach an Rand, Weg und Teichen.
+- Laubbäume aus sieben Klumpen mit kugelförmigen Normalen (weich wie Wolken), Durchleuchten gegen die Sonne, leichte Größen- und Farbvariation. Ein InstancedMesh.
+- Gras-Engine (bis 70 000 Halme), Blumenflecken, Kiesel als Teichränder, Steingruppen, Pollen im Licht. Je ein Draw Call.
 - Wasser: Fresnel-Spiegelung, Sonnenglanz, Tönung, nur außerhalb des Tauchens (`uWasser`).
-- Lichtstrahlen: additive Achsen-Billboards entlang der Sonnenrichtung, ein Draw Call.
-- Nachbearbeitung: Tilt-Shift (zwei Pässe, Schärfeband in der Bildmitte), Bloom, Vignette, Neutral-Tone-Mapping. Beim Tauchen komplett aus.
+- Nachbearbeitung: Umgebungsverdeckung (N8AO, halbe Auflösung), Tilt-Shift, Bloom, Vignette, Neutral-Tone-Mapping. Beim Tauchen komplett aus.
+- Qualitätsstufen (`scene/qualitaet.ts`): ein PerformanceMonitor schaltet bei fallender Bildrate erst AO, dann MSAA und Pixeldichte, dann Gras und Tilt-Shift ab. Gemessener Anteil an der Bildzeit (SwiftShader): weiche VSM-Schatten ≈48 % (deshalb PCF mit Filterradius), Gras ≈30 %, AO ≈25 %, MSAA ≈23 %.
 
 ## Zu Fuß: wie es billig bleibt
 
